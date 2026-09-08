@@ -1,0 +1,47 @@
+// metrix — Prisma schema
+// Modelo de persistencia: ScenarioRecord + AuditEntry
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// Registro de un escenario (cálculo) guardado. Contrato universal del dominio.
+model ScenarioRecord {
+  id            String   @id @default(uuid())
+  scopeId       String
+  module        String // 'quadratic' | 'pricing' | 'roi' | 'actuarial'
+  version       Int      @default(1)
+  inputHash     String
+  formulaVersion String
+  status        String   @default("DRAFT") // DRAFT | COMPUTED | SAVED | RE_RUN
+  inputs        String // JSON serializado (canónico)
+  outputs       String // JSON serializado (inmutable tras SAVED)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  audits     AuditEntry[]
+
+  @@index([scopeId, module])
+  @@index([inputHash])
+  @@unique([scopeId, module, inputHash])
+}
+
+/// Auditoría de mutaciones sobre un escenario (transiciones de estado).
+model AuditEntry {
+  id        String   @id @default(uuid())
+  scenarioId String
+  fromStatus String?
+  toStatus  String
+  action    String // 'CREATE' | 'COMPUTE' | 'SAVE' | 'RE_RUN'
+  detail    String?
+  createdAt DateTime @default(now())
+
+  scenario ScenarioRecord @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+
+  @@index([scenarioId])
+}
