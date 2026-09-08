@@ -60,7 +60,7 @@ const MONEY_KEYS = new Set([
   "finalValue",
 ]);
 
-function trimNumber(value: number): string {
+export function trimNumber(value: number): string {
   if (!Number.isFinite(value)) {
     return String(value);
   }
@@ -88,7 +88,7 @@ function money(n: number, currency?: string): string {
   return `$${trimNumber(n)}`;
 }
 
-function formatValue(key: string, value: unknown, currency?: string): string {
+export function formatValue(key: string, value: unknown, currency?: string): string {
   if (typeof value === "number") {
     if (INTRINSIC_PERCENT_KEYS.has(key)) {
       return numberToPercent(value);
@@ -134,7 +134,7 @@ function renderRow(key: string, value: unknown, currency?: string) {
   );
 }
 
-function prettifyKey(key: string): string {
+export function prettifyKey(key: string): string {
   const spaced = key.replace(/([a-z0-9])([A-Z])/g, "$1 $2");
   return spaced.toLowerCase();
 }

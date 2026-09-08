@@ -32,13 +32,13 @@ export function handleApiError(error: unknown): NextResponse {
 }
 
 /**
- * Lee y parsea el body JSON de una petición, devolviendo { ok, data, error }.
+ * Lee y parsea el body JSON de una petición.
+ * Discriminated union: si `ok` es false, `error` está garantizado (TS lo infiere).
  */
-export async function readJsonBody(request: Request): Promise<{
-  ok: boolean;
-  data?: unknown;
-  error?: NextResponse;
-}> {
+export async function readJsonBody(request: Request): Promise<
+  | { ok: true; data: unknown }
+  | { ok: false; error: NextResponse }
+> {
   try {
     const data = await request.json();
     return { ok: true, data };
