@@ -12,6 +12,7 @@ const navLinks = [
   { href: "/pricing", label: "Precios" },
   { href: "/roi", label: "ROI" },
   { href: "/actuarial", label: "Actuarial" },
+  { href: "/lead-magnet", label: "Lead Magnet" },
   { href: "/historial", label: "Historial" },
 ];
 

@@ -737,6 +737,25 @@ Dado que **no hay deploy remoto** (desarrollo local, SQLite de archivo):
 - [x] **§7 Red teaming**: 10 riesgos, filtro anti-scope-creep, 6 decisiones abiertas, equivalencia Angular→Next.
 - [x] **§8 Rollback** instantáneo + circuit breakers + gobernanza.
 - [x] **Meta 185+ tests**, superando el hito original (PRs #39–#44).
+- [x] **Fase 9 (CA9)**: Replicación del simulador de precios con escenario (`/lead-magnet`) de Metrix AI original (Angular) con gráfico de ganancia, modal de captura de lead, generación de informe PDF (`pdf-lib`), endpoints `/api/v1/lead-magnet` y `/api/v1/leads`, más gráfico cartesiano en vivo en `/quadratic` (`Chart.js`). Suite final: 254 tests (242 vitest + 12 E2E).
+
+---
+
+# 10. 🎯 Fase 9 (CA9): Replicación Lead Magnet & Gráficos Cuadráticos
+
+Requerimiento del usuario para alinear con el proyecto Angular original (`mutualMetricsAngular`):
+1. **Página `/lead-magnet`**:
+   - Hero idéntico ("Herramienta gratuita de Metrix AI", "Descubrí el precio óptimo de tu producto").
+   - Simulador de precios basado en función cuadrática de beneficio `f(x) = A·x² + B·x + C`, calculando precio óptimo (vértice recortado a `[precioMinimo, precioMaximo]`), ganancia máxima y estrategia recomendada (3 escenarios de mercado).
+   - Gráfico de curva de ganancia con Chart.js (24 pasos con punto óptimo destacado).
+   - Modal de captura de lead (nombre, empresa, WhatsApp, email) guardado en tabla SQLite `Lead` via `POST /api/v1/leads`.
+   - Generación y descarga directa en navegador de informe PDF personalizado usando `pdf-lib`.
+2. **Gráfico Cartesiano en `/quadratic`**:
+   - Visualización reactiva en vivo de la parábola `f(x) = a·x² + b·x + c` evaluada en `[vérticeX ± 10]` con paso 0.5 conforme el usuario introduce coeficientes válidos en el formulario.
+3. **Métricas y Calidad**:
+   - +44 tests unitarios/componentes en Vitest (198 → 242 tests en 18 archivos).
+   - +2 tests E2E en Playwright (10 → 12 tests verdes).
+   - Total verificado: **254 tests verdes**, 0 warnings ESLint, typecheck impecable y build de 17 rutas exitoso.
 
 ---
 

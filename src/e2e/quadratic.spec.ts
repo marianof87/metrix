@@ -61,4 +61,22 @@ test.describe("Quadratic calculator", () => {
     // Result panel must NOT appear.
     await expect(page.locator("section[aria-label='Resultado']")).toHaveCount(0);
   });
+
+  test("gráfico cartesiano en vivo: escribir coeficientes muestra el gráfico", async ({
+    page,
+  }) => {
+    await page.goto("/quadratic");
+
+    // Sin coeficientes → placeholder del gráfico.
+    await expect(page.getByTestId("quadratic-chart-empty")).toBeVisible();
+
+    // Escribir a=1, b=-4, c=4 → el gráfico reemplaza el placeholder.
+    await page.getByLabel("Coeficiente a").fill("1");
+    await page.getByLabel("Coeficiente b").fill("-4");
+    await page.getByLabel("Coeficiente c").fill("4");
+
+    await expect(page.getByTestId("quadratic-chart-empty")).toHaveCount(0);
+    await expect(page.getByTestId("quadratic-chart")).toBeVisible();
+    await expect(page.locator("canvas")).toBeVisible();
+  });
 });

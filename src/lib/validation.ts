@@ -67,3 +67,31 @@ export const saveScenarioSchema = z.object({
   inputs: z.record(z.unknown()),
 });
 export type SaveScenarioSchema = z.infer<typeof saveScenarioSchema>;
+
+// --- lead-magnet ---
+export const leadMagnetInputSchema = z
+  .object({
+    coeficienteA: z.number().finite(),
+    coeficienteB: z.number().finite(),
+    coeficienteC: z.number().finite(),
+    precioMinimo: z.number().finite().nonnegative(),
+    precioMaximo: z.number().finite().positive(),
+  })
+  .refine((v) => v.coeficienteA < 0, {
+    message: "Coeficiente A debe ser negativo",
+    path: ["coeficienteA"],
+  })
+  .refine((v) => v.precioMaximo > v.precioMinimo, {
+    message: "El precio máximo debe ser mayor que el mínimo",
+    path: ["precioMaximo"],
+  });
+export type LeadMagnetInputSchema = z.infer<typeof leadMagnetInputSchema>;
+
+// --- lead (captura de contacto para informe PDF) ---
+export const leadSchema = z.object({
+  nombre: z.string().trim().min(1).max(120),
+  empresa: z.string().trim().min(1).max(120),
+  whatsapp: z.string().trim().min(6).max(20),
+  email: z.string().trim().email().max(120),
+});
+export type LeadInputSchema = z.infer<typeof leadSchema>;

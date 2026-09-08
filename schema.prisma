@@ -47,3 +47,15 @@ model AuditEntry {
 
   @@index([scenarioId])
 }
+
+/// Lead capturado por el lead magnet (descarga de informe).
+model Lead {
+  id        String   @id @default(uuid())
+  nombre    String
+  empresa   String
+  whatsapp  String
+  email     String
+  createdAt DateTime @default(now())
+
+  @@index([email])
+}

@@ -9,6 +9,7 @@
  * - Botón "Guardar": POST /api/v1/scenarios con { scopeId: "default", module, inputs }
  *   y muestra "Escenario guardado" (política D5: solo se guarda bajo acción explícita).
  * - Soporta grupos dinámicos (p. ej. flujos de caja del ROI) con "Añadir"/"Quitar".
+ * - Prop opcional onValuesChange: notifica el mapa de values en cada cambio de campo.
  */
 
 import { useCallback, useMemo, useState } from "react";
@@ -64,6 +65,8 @@ interface CalculatorFormProps {
   endpoint: string;
   module: ModuleId;
   dynamicGroups?: DynamicGroupDef[];
+  /** Notifica el mapa de values (name → string) en cada cambio de campo. */
+  onValuesChange?: (values: Record<string, string>) => void;
 }
 
 interface PrepareResult {
@@ -87,6 +90,7 @@ export default function CalculatorForm({
   endpoint,
   module,
   dynamicGroups = [],
+  onValuesChange,
 }: CalculatorFormProps) {
   // Estado de los inputs regulares: name → string
   const [values, setValues] = useState<Record<string, string>>(() =>
@@ -173,7 +177,11 @@ export default function CalculatorForm({
   );
 
   const handleFieldChange = useCallback((name: string, value: string) => {
-    setValues((prev) => ({ ...prev, [name]: value }));
+    setValues((prev) => {
+      const next = { ...prev, [name]: value };
+      onValuesChange?.(next);
+      return next;
+    });
     setErrors((prev) => {
       if (!(name in prev)) return prev;
       const next = { ...prev };
@@ -182,7 +190,7 @@ export default function CalculatorForm({
     });
     setApiError(null);
     setSaveMessage(null);
-  }, []);
+  }, [onValuesChange]);
 
   const handleListFieldChange = useCallback(
     (group: string, rowIndex: number, name: string, value: string) => {

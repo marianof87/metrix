@@ -5,6 +5,7 @@ const modules = [
   { href: "/pricing", title: "Simulador de precios", desc: "Calcule precio sugerido, margen, impuestos y descuentos." },
   { href: "/roi", title: "Calculadora de ROI", desc: "Retorno simple y anualizado, NPV, payback e IRR." },
   { href: "/actuarial", title: "Actuario", desc: "Interés compuesto, anualidades, valor presente y primas." },
+  { href: "/lead-magnet", title: "Lead magnet de precios", desc: "Precio óptimo, ganancia máxima y estrategia, con informe PDF." },
 ];
 
 export default function Home() {

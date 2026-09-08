@@ -32,8 +32,9 @@ Abrir `http://localhost:3000` y usar los 4 módulos + Historial.
 
 | Ruta | Módulo |
 |---|---|
-| `/quadratic` | Resolución de ecuación cuadrática |
-| `/pricing` | Sugerencia de precio con margen, impuesto y descuento |
+| `/quadratic` | Resolución de ecuación cuadrática con **gráfico cartesiano en vivo** |
+| `/pricing` | Sugerencia de precio con margen, impuesto y descuento (fórmula v1) |
+| `/lead-magnet` | Simulador de precios con escenario, curva de ganancia, captura de lead e informe PDF |
 | `/roi` | ROI, payback e IRR sobre flujos de caja |
 | `/actuarial` | Cálculo actuarial de capital con interés compuesto |
 | `/historial` | Escenarios guardados: filtros, detalle, auditoría y "Re-ejecutar" |
@@ -46,6 +47,8 @@ así un `SAVED` y un `RE_RUN` del mismo input coexisten.
 ## API
 
 - `POST /api/v1/{quadratic|pricing|roi|actuarial}` — calcular sin persistir
+- `POST /api/v1/lead-magnet` — optimizar precio y generar curva de ganancia (lead magnet)
+- `POST /api/v1/leads` — persistir contacto para descarga de informe PDF
 - `GET /api/v1/scenarios` — listar (`scopeId`, `module`, `status` como query)
 - `POST /api/v1/scenarios` — guardar un escenario (`{ scopeId, module, inputs }`)
 - `GET /api/v1/scenarios/[id]` — detalle + auditoría
@@ -56,14 +59,14 @@ Contrato OpenAPI: `src/app/api/v1/openapi/openapi.json`.
 ## Tests
 
 ```bash
-npm test          # 198 tests Vitest (dominio, servicio, API)
-npm run test:e2e  # 10 tests Playwright (4 módulos + historial) — requiere `npm run dev` o arranca solo
+npm test          # 242 tests Vitest (dominio, servicio, contratos API, componentes)
+npm run test:e2e  # 12 tests Playwright (módulos, lead magnet, gráfico en vivo e historial)
 npm run lint
 npm run typecheck
 npm run build
 ```
 
-Suite total al cierre de Fase 7: **208 tests verdes** (198 unit + 10 E2E).
+Suite total: **254 tests verdes** (242 unit + 12 E2E).
 
 ## Estructura
 
