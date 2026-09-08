@@ -28,7 +28,9 @@ model ScenarioRecord {
 
   @@index([scopeId, module])
   @@index([inputHash])
-  @@unique([scopeId, module, inputHash])
+  // Dedupe por estado: SAVED y RE_RUN del mismo input coexisten (política D4/D5:
+  // re-ejecutar crea NUEVO registro RE_RUN, pero no duplica dentro de un mismo estado).
+  @@unique([scopeId, module, inputHash, status])
 }
 
 /// Auditoría de mutaciones sobre un escenario (transiciones de estado).

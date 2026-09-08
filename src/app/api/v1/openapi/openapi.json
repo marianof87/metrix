@@ -1,0 +1,199 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "metrix API",
+    "version": "0.1.0",
+    "description": "API v1 del proyecto metrix — calculadoras cuadrática, precios, ROI y actuarial + historial de escenarios re-ejecutable."
+  },
+  "paths": {
+    "/api/v1/quadratic": {
+      "post": {
+        "summary": "Resuelve una función cuadrática f(x)=ax²+bx+c",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["a", "b", "c"],
+                "properties": {
+                  "a": { "type": "number", "description": "a ≠ 0" },
+                  "b": { "type": "number" },
+                  "c": { "type": "number" },
+                  "sampleStart": { "type": "number" },
+                  "sampleEnd": { "type": "number" },
+                  "sampleStep": { "type": "number", "exclusiveMinimum": 0 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Resultado con raíces, vértice, concavidad" },
+          "400": { "description": "Input inválido (a=0, datos no numéricos)" }
+        }
+      }
+    },
+    "/api/v1/pricing": {
+      "post": {
+        "summary": "Simulador de precios",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["baseCost", "desiredMarginPct"],
+                "properties": {
+                  "baseCost": { "type": "number", "minimum": 0 },
+                  "desiredMarginPct": { "type": "number", "minimum": 0, "exclusiveMaximum": 1 },
+                  "taxPct": { "type": "number", "minimum": 0 },
+                  "quantity": { "type": "number", "minimum": 0 },
+                  "discountPct": { "type": "number", "minimum": 0, "maximum": 1 },
+                  "currency": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Precio sugerido y desglose" },
+          "400": { "description": "Input inválido" }
+        }
+      }
+    },
+    "/api/v1/roi": {
+      "post": {
+        "summary": "Calculadora de ROI (simple, anualizado, NPV, payback, TIR)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["initialInvestment"],
+                "properties": {
+                  "initialInvestment": { "type": "number", "minimum": 0 },
+                  "finalValue": { "type": "number" },
+                  "periods": { "type": "integer", "minimum": 1 },
+                  "cashFlows": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": ["period", "amount"],
+                      "properties": {
+                        "period": { "type": "integer", "minimum": 1 },
+                        "amount": { "type": "number" }
+                      }
+                    }
+                  },
+                  "discountRatePct": { "type": "number", "minimum": 0 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Resultado ROI" },
+          "400": { "description": "Input inválido o TIR no converge" }
+        }
+      }
+    },
+    "/api/v1/actuarial": {
+      "post": {
+        "summary": "Módulo actuario (interés compuesto, anualidad, valor presente, prima)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["principal", "annualRatePct", "periodsPerYear", "years"],
+                "properties": {
+                  "principal": { "type": "number", "minimum": 0 },
+                  "annualRatePct": { "type": "number", "minimum": 0, "exclusiveMaximum": 1 },
+                  "periodsPerYear": { "type": "number", "exclusiveMinimum": 0 },
+                  "years": { "type": "number", "minimum": 0 },
+                  "contributionPerPeriod": { "type": "number", "minimum": 0 },
+                  "mortality": {
+                    "type": "object",
+                    "properties": {
+                      "age": { "type": "number", "minimum": 0 },
+                      "premium": { "type": "number", "minimum": 0 },
+                      "coverage": { "type": "number", "minimum": 0 },
+                      "mortalityProbability": { "type": "number", "minimum": 0, "maximum": 1 }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Resultado actuarial" },
+          "400": { "description": "Input inválido" }
+        }
+      }
+    },
+    "/api/v1/scenarios": {
+      "get": {
+        "summary": "Lista escenarios guardados (filtrable por scopeId, module, status)",
+        "parameters": [
+          { "name": "scopeId", "in": "query", "schema": { "type": "string" } },
+          { "name": "module", "in": "query", "schema": { "type": "string", "enum": ["quadratic", "pricing", "roi", "actuarial"] } },
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["DRAFT", "COMPUTED", "SAVED", "RE_RUN"] } }
+        ],
+        "responses": {
+          "200": { "description": "Lista de escenarios" }
+        }
+      },
+      "post": {
+        "summary": "Guarda un escenario (acción explícita Guardar)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["scopeId", "module", "inputs"],
+                "properties": {
+                  "scopeId": { "type": "string" },
+                  "module": { "type": "string", "enum": ["quadratic", "pricing", "roi", "actuarial"] },
+                  "inputs": { "type": "object" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Escenario guardado" },
+          "400": { "description": "Input inválido" }
+        }
+      }
+    },
+    "/api/v1/scenarios/{id}": {
+      "get": {
+        "summary": "Detalle de un escenario + auditoría",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Escenario y audits" },
+          "404": { "description": "No encontrado" }
+        }
+      }
+    },
+    "/api/v1/scenarios/{id}/re-run": {
+      "post": {
+        "summary": "Re-ejecuta un escenario desde historial (crea registro RE_RUN)",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "201": { "description": "Nuevo registro RE_RUN" },
+          "400": { "description": "No se pudo re-ejecutar" }
+        }
+      }
+    }
+  }
+}

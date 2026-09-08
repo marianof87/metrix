@@ -68,7 +68,17 @@ export interface CreateScenarioInput {
 export interface ScenarioRepo {
   create(data: CreateScenarioInput): Promise<ScenarioRecord>;
   findById(id: string): Promise<ScenarioRecord | null>;
-  findByUniqueKey(scopeId: string, module: ScenarioModule, inputHash: string): Promise<ScenarioRecord | null>;
+  /**
+   * Busca por key de idempotencia. `status` opcional: en la BD la unicidad es
+   * (scopeId, module, inputHash, status); pasarlo permite dedupe por estado
+   * (SAVED para save, RE_RUN para reRun).
+   */
+  findByUniqueKey(
+    scopeId: string,
+    module: ScenarioModule,
+    inputHash: string,
+    status?: ScenarioStatus
+  ): Promise<ScenarioRecord | null>;
   list(params: {
     scopeId?: string;
     module?: ScenarioModule;
@@ -114,10 +124,17 @@ export class PrismaScenarioRepo implements ScenarioRepo {
   async findByUniqueKey(
     scopeId: string,
     module: ScenarioModule,
-    inputHash: string
+    inputHash: string,
+    status?: ScenarioStatus
   ): Promise<ScenarioRecord | null> {
-    const row = await prisma.scenarioRecord.findUnique({
-      where: { scopeId_module_inputHash: { scopeId, module, inputHash } },
+    const row = await prisma.scenarioRecord.findFirst({
+      where: {
+        scopeId,
+        module,
+        inputHash,
+        ...(status ? { status } : {}),
+      },
+      orderBy: { createdAt: "desc" },
     });
     return row ? toScenarioRecord(row) : null;
   }

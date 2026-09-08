@@ -44,9 +44,15 @@ export class InMemoryScenarioRepo implements ScenarioRepoPort {
   async findByUniqueKey(
     scopeId: string,
     module: ScenarioModule,
-    inputHash: string
+    inputHash: string,
+    status?: ScenarioStatus
   ): Promise<ScenarioRecord | null> {
-    return this.records.find((r) => r.scopeId === scopeId && r.module === module && r.inputHash === inputHash) ?? null;
+    // Devuelve el más reciente que cumpla (status opcional).
+    const matches = this.records
+      .filter((r) => r.scopeId === scopeId && r.module === module && r.inputHash === inputHash)
+      .filter((r) => (status ? r.status === status : true))
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    return matches[0] ?? null;
   }
 
   async list(params: { scopeId?: string; module?: ScenarioModule; status?: ScenarioStatus } = {}): Promise<ScenarioRecord[]> {

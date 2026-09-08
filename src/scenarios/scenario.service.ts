@@ -18,7 +18,7 @@ import { solveQuadratic } from "@/domain/quadratic/quadratic";
 import { calculatePricing } from "@/domain/pricing/pricing";
 import { calculateRoi } from "@/domain/roi/roi";
 import { calculateActuarial } from "@/domain/actuarial/actuarial";
-import { ScenarioRepo, ScenarioRepoPort } from "./scenario.repo";
+import { ScenarioRepo, ScenarioRepoPort, PrismaScenarioRepo } from "./scenario.repo";
 import { ScenarioModule, ScenarioStatus, ScenarioRecord } from "./types";
 
 export class ScenarioServiceError extends Error {
@@ -105,11 +105,27 @@ export class ScenarioService {
    */
   async save(scopeId: string, module: ScenarioModule, inputs: Record<string, unknown>): Promise<ScenarioRecord> {
     const inputHash = computeInputHash(module, inputs);
-    const existing = await this.repo.findByUniqueKey(scopeId, module, inputHash);
-    if (existing && existing.status === "SAVED") {
-      return existing;
+    // Dedupe por estado: si ya existe un SAVED con este input, no duplicar.
+    const existingSaved = await this.repo.findByUniqueKey(scopeId, module, inputHash, "SAVED");
+    if (existingSaved) {
+      return existingSaved;
     }
-    // Crea o actualiza a SAVED.
+    // Puede existir un DRAFT/COMPUTED/RE_RUN con el mismo input; si no es SAVED
+    // se reutiliza (sin duplicar su estado), salvo que sea RE_RUN (se conserva).
+    const existing = await this.repo.findByUniqueKey(scopeId, module, inputHash);
+    if (existing && existing.status !== "RE_RUN") {
+      const outputs = await this.compute(existing);
+      const from = existing.status;
+      const record = await this.repo.updateStatus(existing.id, "SAVED", outputs);
+      await this.repo.createAudit({
+        scenarioId: record.id,
+        fromStatus: from,
+        toStatus: "SAVED",
+        action: "SAVE",
+      });
+      return record;
+    }
+    // No existe o el único existente es RE_RUN: crear un registro nuevo SAVED.
     let record = existing ?? (await this.create(scopeId, module, inputs));
     if (record.status !== "SAVED") {
       const outputs = await this.compute(record);
@@ -132,9 +148,10 @@ export class ScenarioService {
    */
   async reRun(scopeId: string, module: ScenarioModule, inputs: Record<string, unknown>): Promise<ScenarioRecord> {
     const inputHash = computeInputHash(module, inputs);
-    const existing = await this.repo.findByUniqueKey(scopeId, module, inputHash);
-    if (existing && existing.status === "RE_RUN") {
-      return existing;
+    // Dedupe por estado: si ya existe un RE_RUN con este input, no duplicar.
+    const existingRerun = await this.repo.findByUniqueKey(scopeId, module, inputHash, "RE_RUN");
+    if (existingRerun) {
+      return existingRerun;
     }
     // Creamos un registro nuevo con status RE_RUN directamente.
     let record = await this.repo.create({
