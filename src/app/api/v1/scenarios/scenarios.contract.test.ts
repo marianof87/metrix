@@ -118,4 +118,60 @@ describe("api/v1/scenarios", () => {
     expect(data.scenario.id).not.toBe(savedData.scenario.id);
     IDS_TO_CLEAN.push(data.scenario.id);
   });
+
+  it("POST con inputs que el dominio rechaza (quadratic a=0) → 400", async () => {
+    const res = await call(savePost, {
+      scopeId: "api-test-400",
+      module: "quadratic",
+      inputs: { a: 0, b: 1, c: 1 },
+    });
+    expect(res.status).toBe(400);
+    // El save deja un DRAFT persistido; se limpia para no contaminar la BD.
+    const leaked = await prisma.scenarioRecord.findMany({
+      where: { scopeId: "api-test-400" },
+      select: { id: true },
+    });
+    await prisma.auditEntry.deleteMany({ where: { scenarioId: { in: leaked.map((r) => r.id) } } });
+    await prisma.scenarioRecord.deleteMany({ where: { scopeId: "api-test-400" } });
+  });
+
+  it("201 shape: la respuesta contiene scenario.id, module, inputs e inputHash", async () => {
+    const res = await call(savePost, {
+      scopeId: "api-test-shape",
+      module: "roi",
+      inputs: { initialInvestment: 100, finalValue: 120 },
+    });
+    expect(res.status).toBe(201);
+    const data = await res.json();
+    expect(data.scenario.id).toBeDefined();
+    expect(data.scenario.module).toBe("roi");
+    expect(data.scenario.status).toBe("SAVED");
+    expect(data.scenario.inputs).toEqual({ initialInvestment: 100, finalValue: 120 });
+    expect(data.scenario.inputHash).toBeDefined();
+    IDS_TO_CLEAN.push(data.scenario.id);
+  });
+
+  it("GET lista filtrada por module", async () => {
+    const saved = await call(savePost, {
+      scopeId: "api-test-mod",
+      module: "actuarial",
+      inputs: { principal: 100, annualRatePct: 0.05, periodsPerYear: 1, years: 1 },
+    });
+    const savedData = await saved.json();
+    IDS_TO_CLEAN.push(savedData.scenario.id);
+
+    const res = await listGet(
+      new Request("http://localhost/api/scenarios?scopeId=api-test-mod&module=actuarial")
+    );
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.scenarios.length).toBeGreaterThanOrEqual(1);
+    expect(data.scenarios.every((s: { module: string }) => s.module === "actuarial")).toBe(true);
+
+    const other = await listGet(
+      new Request("http://localhost/api/scenarios?scopeId=api-test-mod&module=roi")
+    );
+    const otherData = await other.json();
+    expect(otherData.scenarios.length).toBe(0);
+  });
 });

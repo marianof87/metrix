@@ -248,7 +248,7 @@ function renderArray(key: string, arr: unknown[], currency?: string) {
     <div className="flex items-start justify-between gap-4 border-b border-zinc-100 py-1.5 last:border-0">
       <dt className="text-sm capitalize text-zinc-500">{prettifyKey(key)}</dt>
       <dd className="text-right text-sm font-medium text-zinc-900">
-        [{arr.map((v, i) => formatValue(key, v, currency)).join(", ")}]
+        [{arr.map((v) => formatValue(key, v, currency)).join(", ")}]
       </dd>
     </div>
   );

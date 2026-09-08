@@ -4,7 +4,6 @@
  * Capa de aplicación: traduce registros de BD (JSON strings) a objetos tipados.
  */
 
-import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ScenarioModule, ScenarioStatus, ScenarioRecord, AuditEntryRecord } from "./types";
 

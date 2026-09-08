@@ -8,7 +8,7 @@
  *   con validación 0 ≤ desiredMarginPct < 1.
  */
 
-import { round, div, add, sub, mul } from "../shared/decimal";
+import { round, div, sub, mul } from "../shared/decimal";
 
 export const PRICING_FORMULA_VERSION = "pricing-v1";
 

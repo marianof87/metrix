@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { ScenarioService } from "@/scenarios/scenario.service";
 import { jsonError, jsonOk } from "@/lib/api";
 

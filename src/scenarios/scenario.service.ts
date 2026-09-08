@@ -18,7 +18,7 @@ import { solveQuadratic } from "@/domain/quadratic/quadratic";
 import { calculatePricing } from "@/domain/pricing/pricing";
 import { calculateRoi } from "@/domain/roi/roi";
 import { calculateActuarial } from "@/domain/actuarial/actuarial";
-import { ScenarioRepo, ScenarioRepoPort, PrismaScenarioRepo } from "./scenario.repo";
+import { ScenarioRepoPort, PrismaScenarioRepo } from "./scenario.repo";
 import { ScenarioModule, ScenarioStatus, ScenarioRecord } from "./types";
 
 export class ScenarioServiceError extends Error {
@@ -58,18 +58,25 @@ export class ScenarioService {
   /**
    * Crea un escenario DRAFT. No computa ni guarda outputs aún.
    */
-  async create(scopeId: string, module: ScenarioModule, inputs: Record<string, unknown>): Promise<ScenarioRecord> {
+  async create(
+    scopeId: string,
+    module: ScenarioModule,
+    inputs: Record<string, unknown>,
+    opts: { forceNew?: boolean } = {}
+  ): Promise<ScenarioRecord> {
     const inputHash = computeInputHash(module, inputs);
-    const existing = await this.repo.findByUniqueKey(scopeId, module, inputHash);
-    if (existing) {
-      // Ya existe (mismo input). Política D4/D5: devolver el existente sin duplicar.
-      return existing;
+    if (!opts.forceNew) {
+      const existing = await this.repo.findByUniqueKey(scopeId, module, inputHash);
+      if (existing) {
+        // Ya existe (mismo input). Política D4/D5: devolver el existente sin duplicar.
+        return existing;
+      }
     }
     const record = await this.repo.create({
       scopeId,
       module,
       inputHash,
-      formulaVersion: this.formulaVersionFor(module, inputs),
+      formulaVersion: this.formulaVersionFor(module),
       inputs,
     });
     await this.repo.createAudit({
@@ -125,8 +132,14 @@ export class ScenarioService {
       });
       return record;
     }
-    // No existe o el único existente es RE_RUN: crear un registro nuevo SAVED.
-    let record = existing ?? (await this.create(scopeId, module, inputs));
+    // No existe SAVED: si el único existente es RE_RUN, NO se reutiliza
+    // (auditoría inmutable, D4): se crea un registro nuevo SAVED.
+    let record: ScenarioRecord;
+    if (existing && existing.status === "RE_RUN") {
+      record = await this.create(scopeId, module, inputs, { forceNew: true });
+    } else {
+      record = existing ?? (await this.create(scopeId, module, inputs));
+    }
     if (record.status !== "SAVED") {
       const outputs = await this.compute(record);
       const from = record.status;
@@ -158,7 +171,7 @@ export class ScenarioService {
       scopeId,
       module,
       inputHash,
-      formulaVersion: this.formulaVersionFor(module, inputs),
+      formulaVersion: this.formulaVersionFor(module),
       inputs,
     });
     const outputs = await this.compute(record);
@@ -172,7 +185,7 @@ export class ScenarioService {
     return record;
   }
 
-  private formulaVersionFor(module: ScenarioModule, inputs: Record<string, unknown>): string {
+  private formulaVersionFor(module: ScenarioModule): string {
     switch (module) {
       case "quadratic":
         return "quadratic-v1";

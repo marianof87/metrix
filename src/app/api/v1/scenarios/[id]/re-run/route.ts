@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { ScenarioService } from "@/scenarios/scenario.service";
 import { jsonError, jsonOk } from "@/lib/api";
 
@@ -18,10 +17,10 @@ export async function POST(
   try {
     const original = await service.getById(id);
     const scopeId = original.scopeId;
-    const module = original.module;
+    const moduleParam = original.module;
     const inputs = original.inputs;
 
-    const rerun = await service.reRun(scopeId, module, inputs);
+    const rerun = await service.reRun(scopeId, moduleParam, inputs);
     return jsonOk({ scenario: rerun, reRunOf: id }, { status: 201 });
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : "Error re-running scenario", 400);

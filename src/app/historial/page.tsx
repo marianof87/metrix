@@ -12,7 +12,7 @@ export default function HistorialPage() {
     <div>
       <h1 className="text-2xl font-bold">Historial</h1>
       <p className="mt-1 text-sm text-zinc-600">
-        Escenarios guardados (scope "default"). Consulte el detalle, la
+        Escenarios guardados (scope &quot;default&quot;). Consulte el detalle, la
         auditoría o re-ejecute un escenario para crear un registro RE_RUN.
       </p>
       <div className="mt-6">

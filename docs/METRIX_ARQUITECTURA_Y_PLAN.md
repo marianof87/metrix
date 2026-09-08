@@ -68,8 +68,11 @@ de materialized views en Postgres).
 **3. Estado explícito del escenario (state machine).**
 Un escenario recorre: `DRAFT (borrador) → COMPUTED (calculado) → SAVED (persistido) →
 RE_RUN (re-ejecutado)`. La transición `COMPUTED → SAVED` es una escritura idempotente
-guiada por una clave única (`scopeId + module + inputHash`). Nada se escribe sin
-validación de esquema previa.
+guiada por una clave única (**`scopeId + module + inputHash + status`**: un `SAVED` y un
+`RE_RUN` del mismo input coexisten; el dedupe es por estado). Nada se escribe sin
+validación de esquema previa. El `RE_RUN` es inmutable: nunca se reutiliza para un
+`SAVED` nuevo (`save()` crea un registro nuevo si el único existente es `RE_RUN` — fix
+D4 de Fase 7, cubierto por 5 tests de regresión).
 → Precedente: máquinas de estado en protocolos; transacciones ACID.
 
 **4. Gobernanza por diseño.**
@@ -555,15 +558,25 @@ frontend-dev, backend-dev) operen sin ambigüedad.
 
 ## Fase 6 — Cross-slice Historial "Re-ejecutar desde Historial" (SPECIFY → VERIFY → IMPLEMENT)
 **Depende de**: Fase 3 (servicio) + Fase 5 (UI).
-- [ ] UI historial: listar escenarios filtrables, ver detalle, botón "Re-ejecutar".
-- [ ] E2E `historial.spec.ts`: crear escenario → guardar → re-ejecutar → aparece nuevo registro / actualiza estado sin duplicar.
-- **CA6**: flujo completo verde en Playwright; `inputHash` dedupe funciona desde la UI.
+- [x] UI historial: listar escenarios filtrables, ver detalle, botón "Re-ejecutar".
+- [x] E2E `historial.spec.ts`: crear escenario → guardar → re-ejecutar → aparece nuevo registro / actualiza estado sin duplicar.
+- **CA6**: flujo completo verde en Playwright; `inputHash` dedupe funciona desde la UI. ✅ 2026-09-08 — commit `adb6d54`.
+
+**Decisiones tomadas en Fase 6 (REFRESH)**:
+- **Schema Prisma movido a la raíz** (`schema.prisma`) con `"prisma": { "schema": "schema.prisma" }` en `package.json`: unifica la resolución de `DATABASE_URL=file:./prisma/dev.db` entre CLI (`prisma db push`) y runtime, dejando UNA sola base SQLite canónica en `prisma/dev.db`.
+- **Clave única por estado**: `@@unique([scopeId, module, inputHash, status])` — permite que un `SAVED` y un `RE_RUN` del mismo input coexistan; el dedupe es por estado, no global (materializa R7).
 
 ## Fase 7 — REFRESH (docs/schemas) + test de humo (protocolo fase 6)
 **Depende de**: todas.
-- [ ] `npm run build` en producción; `npm run lint`; `npm run typecheck`; correr **toda** la suite.
-- [ ] Actualizar este blueprint con decisiones tomadas (fórmulas v1 firmadas, alcance actuarial).
-- **CA7**: build limpio; 0 errores TS; lint sin warnings bloqueantes; **≥185 tests verdes** (unidad + API + E2E).
+- [x] `npm run build` en producción; `npm run lint`; `npm run typecheck`; correr **toda** la suite.
+- [x] Actualizar este blueprint con decisiones tomadas (fórmulas v1 firmadas, alcance actuarial).
+- **CA7**: build limpio; 0 errores TS; lint sin warnings bloqueantes; **≥185 tests verdes** (unidad + API + E2E). ✅ 2026-09-08.
+
+**Logros Fase 7**:
+- **Lint**: `eslint.config.mjs` migrado a `FlatCompat` (formato oficial de Next 15/ESLint 9; la importación directa de `eslint-config-next` ya no es flat-config). Resultado: 0 errores, 0 warnings.
+- **Suite**: **208 tests verdes** (198 Vitest unit + 10 Playwright E2E), superando el hito de 185.
+- **E2E por módulo**: `quadratic.spec.ts`, `pricing.spec.ts`, `roi.spec.ts`, `actuarial.spec.ts` (flujo feliz + 1 caso borde Zod por módulo) + `historial.spec.ts` (full flow + dedupe UI).
+- **Bug D4 corregido (con tests RED → GREEN)**: `save()` mutaba un `RE_RUN` existente a `SAVED` cuando no había `SAVED` previo (auditoría ilegal `RE_RUN→SAVED`). Fix: si el único registro es `RE_RUN`, `save()` crea un `SAVED` **nuevo** (`create(..., { forceNew: true })`) preservando el `RE_RUN` intacto. 5 tests de regresión añadidos en `scenario.service.test.ts`.
 
 ## Fase 8 — RELEASE (protocolo fase 7)
 **Depende de**: Fase 7.
@@ -591,7 +604,7 @@ F0 → F1 → F2 ──┐
 | API | Vitest (contrato) / supertest | validación Zod, shapes, códigos HTTP | ≥60% |
 | E2E UI | Playwright | flujos felices + 1 borde por módulo + historial | crítica |
 
-Meta: **≥185 tests verdes** (superando el hito original de 185 con mejor cobertura de dominio).
+Meta: **≥185 tests verdes** ✅ superado — **208 tests** (198 Vitest unit + 10 Playwright E2E) al cierre de Fase 7 (2026-09-08).
 
 ## 6.2 Casos borde obligatorios (red teaming preventivo)
 

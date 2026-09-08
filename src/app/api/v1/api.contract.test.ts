@@ -5,11 +5,21 @@
  * CA4.
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, afterAll } from "vitest";
 import { POST as quadraticPost } from "@/app/api/v1/quadratic/route";
 import { POST as pricingPost } from "@/app/api/v1/pricing/route";
 import { POST as roiPost } from "@/app/api/v1/roi/route";
 import { POST as actuarialPost } from "@/app/api/v1/actuarial/route";
+import { POST as scenariosPost } from "@/app/api/v1/scenarios/route";
+import { GET as getScenarioById } from "@/app/api/v1/scenarios/[id]/route";
+import { prisma } from "@/lib/prisma";
+
+const SAVED_IDS: string[] = [];
+
+afterAll(async () => {
+  await prisma.auditEntry.deleteMany({ where: { scenarioId: { in: SAVED_IDS } } });
+  await prisma.scenarioRecord.deleteMany({ where: { id: { in: SAVED_IDS } } });
+});
 
 async function call(fn: (req: Request) => Promise<Response>, body: unknown) {
   return fn(new Request("http://localhost/api", {
@@ -45,6 +55,11 @@ describe("api/v1/quadratic", () => {
     const res = await call(quadraticPost, { a: "x", b: 1, c: 1 });
     expect(res.status).toBe(400);
   });
+
+  it("sampleStep = 0 → 400 Zod (debe ser positive)", async () => {
+    const res = await call(quadraticPost, { a: 1, b: 1, c: 1, sampleStep: 0 });
+    expect(res.status).toBe(400);
+  });
 });
 
 describe("api/v1/pricing", () => {
@@ -57,6 +72,16 @@ describe("api/v1/pricing", () => {
 
   it("margin >= 1 → 400", async () => {
     const res = await call(pricingPost, { baseCost: 100, desiredMarginPct: 1 });
+    expect(res.status).toBe(400);
+  });
+
+  it("baseCost negativo → 400", async () => {
+    const res = await call(pricingPost, { baseCost: -1, desiredMarginPct: 0.3 });
+    expect(res.status).toBe(400);
+  });
+
+  it("discountPct > 1 → 400", async () => {
+    const res = await call(pricingPost, { baseCost: 100, desiredMarginPct: 0.3, discountPct: 1.5 });
     expect(res.status).toBe(400);
   });
 });
@@ -79,6 +104,11 @@ describe("api/v1/roi", () => {
       initialInvestment: 100,
       cashFlows: [{ period: 0, amount: 50 }],
     });
+    expect(res.status).toBe(400);
+  });
+
+  it("periods = 0 → 400 Zod (debe ser int positive)", async () => {
+    const res = await call(roiPost, { initialInvestment: 100, finalValue: 150, periods: 0 });
     expect(res.status).toBe(400);
   });
 });
@@ -112,6 +142,63 @@ describe("api/v1/actuarial", () => {
       annualRatePct: 1,
       periodsPerYear: 1,
       years: 1,
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("years negativo → 400", async () => {
+    const res = await call(actuarialPost, {
+      principal: 1000,
+      annualRatePct: 0.05,
+      periodsPerYear: 1,
+      years: -1,
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("mortalityProbability > 1 → 400", async () => {
+    const res = await call(actuarialPost, {
+      principal: 0,
+      annualRatePct: 0,
+      periodsPerYear: 1,
+      years: 1,
+      mortality: { age: 40, premium: 90, coverage: 10000, mortalityProbability: 1.5 },
+    });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("api/v1/scenarios", () => {
+  it("GET /scenarios/:id inexistente → 404", async () => {
+    const res = await getScenarioById(new Request("http://localhost/api"), {
+      params: Promise.resolve({ id: "no-existe-contract" }),
+    });
+    expect(res.status).toBe(404);
+    const data = await res.json();
+    expect(data.error).toBeDefined();
+  });
+
+  it("POST válido → 201 con scenario.id, status SAVED y shape consistente", async () => {
+    const res = await call(scenariosPost, {
+      scopeId: "api-contract-201",
+      module: "quadratic",
+      inputs: { a: 1, b: -3, c: 2 },
+    });
+    expect(res.status).toBe(201);
+    const data = await res.json();
+    expect(data.scenario.id).toBeDefined();
+    expect(data.scenario.status).toBe("SAVED");
+    expect(data.scenario.module).toBe("quadratic");
+    expect(data.scenario.inputs).toEqual({ a: 1, b: -3, c: 2 });
+    expect(data.scenario.inputHash).toMatch(/^[a-f0-9]{64}$/);
+    SAVED_IDS.push(data.scenario.id);
+  });
+
+  it("POST con module inválido → 400 Zod", async () => {
+    const res = await call(scenariosPost, {
+      scopeId: "api-contract-badmod",
+      module: "nope",
+      inputs: {},
     });
     expect(res.status).toBe(400);
   });

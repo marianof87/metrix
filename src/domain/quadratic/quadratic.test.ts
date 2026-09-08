@@ -112,6 +112,123 @@ describe("domain/quadratic", () => {
     });
   });
 
+  describe("casos borde adicionales: discriminante y precisión", () => {
+    it("Δ < 0 con raíces complejas conjugadas (f(x)=x²+2x+5 → -1 ± 2i)", () => {
+      const r = solveQuadratic({ a: 1, b: 2, c: 5 });
+      expect(r.hasReals).toBe(false);
+      expect(r.discriminant).toBe(-16);
+      expect(r.roots?.kind).toBe("complex");
+      if (r.roots?.kind === "complex") {
+        expect(r.roots.x1).toEqual({ real: -1, imaginary: 2 });
+        expect(r.roots.x2).toEqual({ real: -1, imaginary: -2 });
+      }
+    });
+
+    it("Δ = 0 con raíz doble decimal (f(x)=4x²-4x+1 → 0.5)", () => {
+      const r = solveQuadratic({ a: 4, b: -4, c: 1 });
+      expect(r.discriminant).toBe(0);
+      expect(r.roots?.kind).toBe("double");
+      if (r.roots?.kind === "double") {
+        expect(approxEq(r.roots.x, 0.5)).toBe(true);
+      }
+      expect(approxEq(r.vertex.x, 0.5)).toBe(true);
+      expect(r.vertex.y).toBe(0);
+    });
+
+    it("coeficientes decimales con raíz doble (f(x)=1.5x²-6x+6 → 2)", () => {
+      const r = solveQuadratic({ a: 1.5, b: -6, c: 6 });
+      expect(r.discriminant).toBe(0);
+      if (r.roots?.kind === "double") {
+        expect(approxEq(r.roots.x, 2)).toBe(true);
+      }
+    });
+
+    it("complejas con a<0 y opensUp false (f(x)=-x²-2x-5 → -1 ± 2i)", () => {
+      const r = solveQuadratic({ a: -1, b: -2, c: -5 });
+      expect(r.opensUp).toBe(false);
+      expect(r.hasReals).toBe(false);
+      if (r.roots?.kind === "complex") {
+        expect(r.roots.x1.real).toBe(-1);
+        expect(approxEq(r.roots.x1.imaginary, 2)).toBe(true);
+        expect(r.roots.x2.imaginary).toBe(-2);
+      }
+    });
+
+    it("complejas con coeficientes decimales (f(x)=0.5x²-2x+5 → 2 ± 2.4495i)", () => {
+      const r = solveQuadratic({ a: 0.5, b: -2, c: 5 });
+      expect(r.hasReals).toBe(false);
+      if (r.roots?.kind === "complex") {
+        expect(r.roots.x1.real).toBe(2);
+        expect(approxEq(r.roots.x1.imaginary, 2.44949, 1e-4)).toBe(true);
+      }
+    });
+
+    it("coeficientes grandes con raíz doble exacta (f(x)=1e6x²-2e6x+1e6 → 1)", () => {
+      const r = solveQuadratic({ a: 1e6, b: -2e6, c: 1e6 });
+      expect(Number.isFinite(r.discriminant)).toBe(true);
+      expect(r.roots?.kind).toBe("double");
+      if (r.roots?.kind === "double") {
+        expect(r.roots.x).toBe(1);
+      }
+      expect(r.vertex).toEqual({ x: 1, y: 0 });
+    });
+
+    it("a finito y c muy pequeño: Δ≈b² y raíz despreciable ≈ 0 (f(x)=x²-3x+2e-12)", () => {
+      const r = solveQuadratic({ a: 1, b: -3, c: 2e-12 });
+      expect(r.discriminant).toBe(9);
+      expect(r.hasReals).toBe(true);
+      if (r.roots?.kind === "real") {
+        expect(approxEq(r.roots.x1, 3)).toBe(true);
+        expect(approxEq(r.roots.x2, 0)).toBe(true);
+      }
+    });
+
+    it("raíz doble de un cuadrado perfecto (f(x)=x²-6x+9 → 3)", () => {
+      const r = solveQuadratic({ a: 1, b: -6, c: 9 });
+      expect(r.discriminant).toBe(0);
+      if (r.roots?.kind === "double") {
+        expect(r.roots.x).toBe(3);
+      }
+      expect(r.vertex.y).toBe(0);
+      expect(r.yIntercept).toBe(9);
+    });
+
+    it("y-intercept decimal y concavidad (f(x)=2x²+3x-1.5)", () => {
+      const r = solveQuadratic({ a: 2, b: 3, c: -1.5 });
+      expect(r.opensUp).toBe(true);
+      expect(approxEq(r.yIntercept, -1.5)).toBe(true);
+    });
+  });
+
+  describe("tabla de valores opcional (variantes de dominio)", () => {
+    it("range invertido (sampleStart > sampleEnd) se ordena", () => {
+      const r = solveQuadratic({
+        a: 1,
+        b: 0,
+        c: 0,
+        sampleStart: 2,
+        sampleEnd: -2,
+        sampleStep: 1,
+      });
+      expect(r.domain).toEqual({ xMin: -2, xMax: 2 });
+      expect(r.samples?.length).toBe(5);
+      expect(r.samples?.[0]).toEqual({ x: -2, y: 4 });
+      expect(r.samples?.[4]).toEqual({ x: 2, y: 4 });
+    });
+
+    it("sampleStep = 0 no genera muestras (paso inválido se ignora)", () => {
+      const r = solveQuadratic({ a: 1, b: 0, c: 0, sampleStart: 0, sampleEnd: 3, sampleStep: 0 });
+      expect(r.samples).toBeUndefined();
+      expect(r.domain).toBeUndefined();
+    });
+
+    it("sampleStart sin sampleEnd no genera muestras", () => {
+      const r = solveQuadratic({ a: 1, b: 0, c: 0, sampleStart: 0 });
+      expect(r.samples).toBeUndefined();
+      expect(r.domain).toBeUndefined();
+    });
+  });
+
   it("expone la versión de fórmula congelada", () => {
     expect(solveQuadratic({ a: 1, b: 0, c: 0 }).formulaVersion).toBe(QUADRATIC_FORMULA_VERSION);
   });

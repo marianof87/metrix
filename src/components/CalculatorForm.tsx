@@ -30,7 +30,7 @@ export type ModuleId = "quadratic" | "pricing" | "roi" | "actuarial";
  * por prop (un schema Zod no es serializable en el payload RSC), por eso se
  * resuelven acá por módulo.
  */
-const SCHEMAS: Record<ModuleId, ZodType<any, any, any>> = {
+const SCHEMAS: Record<ModuleId, ZodType> = {
   quadratic: quadraticInputSchema,
   pricing: pricingInputSchema,
   roi: roiInputSchema,

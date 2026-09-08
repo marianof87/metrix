@@ -236,6 +236,207 @@ describe("domain/actuarial", () => {
     });
   });
 
+  describe("casos borde adicionales: zeros en inputs y probabilidades límite", () => {
+    it("principal = 0 con rate > 0 → compuesto 0 y PV 0", () => {
+      const r = calculateActuarial({
+        principal: 0,
+        annualRatePct: 0.05,
+        periodsPerYear: 4,
+        years: 3,
+      });
+      expect(r.compoundAmount).toBe(0);
+      expect(r.compoundInterest).toBe(0);
+      expect(r.presentValueDiscount).toBe(0);
+    });
+
+    it("rate = 0 → compuesto = principal, tasa efectiva 0, PV = principal", () => {
+      const r = calculateActuarial({
+        principal: 500,
+        annualRatePct: 0,
+        periodsPerYear: 12,
+        years: 5,
+      });
+      expect(r.compoundAmount).toBe(500);
+      expect(r.compoundInterest).toBe(0);
+      expect(r.effectiveAnnualRatePct).toBe(0);
+      expect(r.presentValueDiscount).toBe(500);
+    });
+
+    it("contribution = 0 explícito → FV anualidad 0", () => {
+      const r = calculateActuarial({
+        principal: 0,
+        annualRatePct: 0.05,
+        periodsPerYear: 12,
+        years: 1,
+        contributionPerPeriod: 0,
+      });
+      expect(r.futureValueAnnuity).toBe(0);
+    });
+
+    it("years decimal: compuesto fraccional (1000, 10% anual, 0.5 años → ≈1048.81)", () => {
+      const r = calculateActuarial({
+        principal: 1000,
+        annualRatePct: 0.1,
+        periodsPerYear: 1,
+        years: 0.5,
+      });
+      expect(approxEq(r.compoundAmount, 1048.81, 1e-2)).toBe(true);
+    });
+
+    it("capitalización diaria (n=365): 1000 al 5% un año → ≈1051.27", () => {
+      const r = calculateActuarial({
+        principal: 1000,
+        annualRatePct: 0.05,
+        periodsPerYear: 365,
+        years: 1,
+      });
+      expect(approxEq(r.compoundAmount, 1051.27, 1e-2)).toBe(true);
+    });
+
+    it("tasa efectiva trimestral (12% nominal, n=4 → ≈12.55%)", () => {
+      const r = calculateActuarial({
+        principal: 1000,
+        annualRatePct: 0.12,
+        periodsPerYear: 4,
+        years: 1,
+      });
+      expect(approxEq(r.effectiveAnnualRatePct, 0.12551, 1e-4)).toBe(true);
+    });
+
+    it("valor presente mensual (1000, 5%, n=12, 3 años → ≈860.98)", () => {
+      const r = calculateActuarial({
+        principal: 1000,
+        annualRatePct: 0.05,
+        periodsPerYear: 12,
+        years: 3,
+      });
+      expect(approxEq(r.presentValueDiscount, 860.98, 1e-2)).toBe(true);
+    });
+
+    it("FV anualidad con decimales (100/mes, 10% anual, 1 año → ≈1256.56)", () => {
+      const r = calculateActuarial({
+        principal: 0,
+        annualRatePct: 0.1,
+        periodsPerYear: 12,
+        years: 1,
+        contributionPerPeriod: 100,
+      });
+      expect(approxEq(r.futureValueAnnuity ?? 0, 1256.56, 1e-2)).toBe(true);
+    });
+
+    it("years = 0 con contribution → FV anualidad 0 y compuesto = principal", () => {
+      const r = calculateActuarial({
+        principal: 100,
+        annualRatePct: 0.05,
+        periodsPerYear: 12,
+        years: 0,
+        contributionPerPeriod: 50,
+      });
+      expect(r.futureValueAnnuity).toBe(0);
+      expect(r.compoundAmount).toBe(100);
+    });
+
+    it("mortalityProbability = 0 → expectedPayout 0 y netPremium = premium", () => {
+      const r = calculateActuarial({
+        principal: 0,
+        annualRatePct: 0,
+        periodsPerYear: 1,
+        years: 1,
+        mortality: { age: 40, premium: 90, coverage: 10000, mortalityProbability: 0 },
+      });
+      expect(r.mortality?.expectedPayout).toBe(0);
+      expect(r.mortality?.netPremium).toBe(90);
+    });
+
+    it("mortalityProbability = 1 → expectedPayout = coverage (pago pleno)", () => {
+      const r = calculateActuarial({
+        principal: 0,
+        annualRatePct: 0,
+        periodsPerYear: 1,
+        years: 1,
+        mortality: { age: 40, premium: 90, coverage: 10000, mortalityProbability: 1 },
+      });
+      expect(r.mortality?.expectedPayout).toBe(10000);
+      expect(r.mortality?.netPremium).toBe(-9910);
+    });
+
+    it("tabla básica en age = 0 → q = 0.01", () => {
+      const r = calculateActuarial({
+        principal: 0,
+        annualRatePct: 0,
+        periodsPerYear: 1,
+        years: 1,
+        mortality: { age: 0, premium: 100, coverage: 5000 },
+      });
+      expect(r.mortality?.expectedPayout).toBe(50);
+    });
+
+    it("tabla básica satura q en 1 para edades extremas", () => {
+      const r = calculateActuarial({
+        principal: 0,
+        annualRatePct: 0,
+        periodsPerYear: 1,
+        years: 1,
+        mortality: { age: 1000000, premium: 100, coverage: 200 },
+      });
+      expect(r.mortality?.expectedPayout).toBe(200);
+    });
+
+    it("con rate/principal 0 y mortalidad, todos los valores son finitos (sin NaN/Infinity)", () => {
+      const r = calculateActuarial({
+        principal: 0,
+        annualRatePct: 0,
+        periodsPerYear: 1,
+        years: 1,
+        mortality: { age: 1000, premium: 0, coverage: 1000, mortalityProbability: 1 },
+      });
+      const values = [
+        r.compoundAmount,
+        r.compoundInterest,
+        r.effectiveAnnualRatePct,
+        r.presentValueDiscount,
+        r.futureValueAnnuity ?? 0,
+        ...(r.mortality
+          ? [r.mortality.premiumPv, r.mortality.expectedPayout, r.mortality.netPremium ?? 0]
+          : []),
+      ];
+      for (const v of values) {
+        expect(Number.isFinite(v)).toBe(true);
+      }
+    });
+
+    it("principal/rate/periodsPerYear negativos → error", () => {
+      expect(() =>
+        calculateActuarial({ principal: -1, annualRatePct: 0.05, periodsPerYear: 1, years: 1 })
+      ).toThrow(ActuarialDomainError);
+      expect(() =>
+        calculateActuarial({ principal: 100, annualRatePct: -0.05, periodsPerYear: 1, years: 1 })
+      ).toThrow(ActuarialDomainError);
+      expect(() =>
+        calculateActuarial({ principal: 100, annualRatePct: 0.05, periodsPerYear: -1, years: 1 })
+      ).toThrow(ActuarialDomainError);
+    });
+
+    it("breakdown refleja contributionPerPeriod provisto u omitido", () => {
+      const withC = calculateActuarial({
+        principal: 100,
+        annualRatePct: 0.05,
+        periodsPerYear: 2,
+        years: 1,
+        contributionPerPeriod: 10,
+      });
+      expect(withC.breakdown.contributionPerPeriod).toBe(10);
+      const withoutC = calculateActuarial({
+        principal: 100,
+        annualRatePct: 0.05,
+        periodsPerYear: 2,
+        years: 1,
+      });
+      expect(withoutC.breakdown.contributionPerPeriod).toBeUndefined();
+      expect(withoutC.futureValueAnnuity).toBeUndefined();
+    });
+  });
+
   it("expone la versión de fórmula congelada", () => {
     expect(
       calculateActuarial({

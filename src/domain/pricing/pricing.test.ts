@@ -110,6 +110,100 @@ describe("domain/pricing", () => {
     });
   });
 
+  describe("casos borde adicionales: edges de inputs y precisión", () => {
+    it("margin = 0 → precio = baseCost sin mark-up", () => {
+      const r = calculatePricing({ baseCost: 120, desiredMarginPct: 0 });
+      expect(r.suggestedPrice).toBe(120);
+      expect(r.grossMargin).toBe(0);
+      expect(r.marginPct).toBe(0);
+    });
+
+    it("discountPct = 1 (límite permitido) → precio con descuento 0", () => {
+      const r = calculatePricing({ baseCost: 100, desiredMarginPct: 0.3, discountPct: 1 });
+      expect(r.priceWithDiscount).toBe(0);
+      expect(r.finalPrice).toBe(0);
+    });
+
+    it("quantity = 0 → no totaliza (totalRevenue/totalCost undefined)", () => {
+      const r = calculatePricing({ baseCost: 100, desiredMarginPct: 0.3, quantity: 0 });
+      expect(r.totalRevenue).toBeUndefined();
+      expect(r.totalCost).toBeUndefined();
+      expect(r.finalPrice).toBeGreaterThan(0);
+    });
+
+    it("precisión determinista en la cadena completa (0.1/0.2/0.1/0.21)", () => {
+      const r = calculatePricing({
+        baseCost: 0.1,
+        desiredMarginPct: 0.2,
+        discountPct: 0.1,
+        taxPct: 0.21,
+      });
+      expect(r.suggestedPrice).toBe(0.125);
+      expect(r.priceWithDiscount).toBe(0.1125);
+      expect(r.priceWithTax).toBe(0.136125);
+      expect(r.finalPrice).toBe(0.136125);
+    });
+
+    it("sin ruido 0.1+0.2: margin y addedValue exactos", () => {
+      const r = calculatePricing({ baseCost: 0.1, desiredMarginPct: 0.2 });
+      expect(r.marginPct).toBe(0.2);
+      expect(r.breakdown.addedValue).toBe(0.025);
+      expect(r.suggestedPrice).toBe(Number(r.suggestedPrice.toFixed(10)));
+    });
+
+    it("tax alto 0.99 escala el precio final", () => {
+      const r = calculatePricing({ baseCost: 100, desiredMarginPct: 0.3, taxPct: 0.99 });
+      expect(approxEq(r.finalPrice, 284.2857, 1e-3)).toBe(true);
+    });
+
+    it("baseCost=0 con descuento, impuesto y quantity → todo 0", () => {
+      const r = calculatePricing({
+        baseCost: 0,
+        desiredMarginPct: 0.2,
+        discountPct: 0.5,
+        taxPct: 0.21,
+        quantity: 5,
+      });
+      expect(r.suggestedPrice).toBe(0);
+      expect(r.priceWithDiscount).toBe(0);
+      expect(r.finalPrice).toBe(0);
+      expect(r.totalRevenue).toBe(0);
+      expect(r.totalCost).toBe(0);
+      expect(r.grossMargin).toBe(0);
+    });
+
+    it("discountPct negativo → error", () => {
+      expect(() =>
+        calculatePricing({ baseCost: 100, desiredMarginPct: 0.3, discountPct: -0.1 })
+      ).toThrow(PricingDomainError);
+    });
+
+    it("taxPct negativo → error", () => {
+      expect(() =>
+        calculatePricing({ baseCost: 100, desiredMarginPct: 0.3, taxPct: -0.1 })
+      ).toThrow(PricingDomainError);
+    });
+
+    it("discountPct = 0 explícito equivale a omitido", () => {
+      const withZero = calculatePricing({ baseCost: 100, desiredMarginPct: 0.3, discountPct: 0 });
+      const omitted = calculatePricing({ baseCost: 100, desiredMarginPct: 0.3 });
+      expect(withZero.priceWithDiscount).toBe(omitted.priceWithDiscount);
+      expect(withZero.finalPrice).toBe(omitted.finalPrice);
+    });
+
+    it("taxPct = 0 explícito equivale a omitido", () => {
+      const withZero = calculatePricing({ baseCost: 100, desiredMarginPct: 0.3, taxPct: 0 });
+      const omitted = calculatePricing({ baseCost: 100, desiredMarginPct: 0.3 });
+      expect(withZero.finalPrice).toBe(omitted.finalPrice);
+    });
+
+    it("margin cercano a 1 (0.999) → precio amplificado pero finito y exacto", () => {
+      const r = calculatePricing({ baseCost: 1, desiredMarginPct: 0.999 });
+      expect(Number.isFinite(r.suggestedPrice)).toBe(true);
+      expect(r.suggestedPrice).toBe(1000);
+    });
+  });
+
   it("expone la versión de fórmula congelada", () => {
     expect(calculatePricing({ baseCost: 1, desiredMarginPct: 0.1 }).formulaVersion).toBe(
       PRICING_FORMULA_VERSION
