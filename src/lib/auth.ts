@@ -78,6 +78,7 @@ export async function getAuthSession(request: Request): Promise<SessionPayload |
 
 /**
  * Pone la cookie de sesión en el response: HttpOnly; Path=/; SameSite=Lax.
+ * Secure solo en producción (MINOR-1: en dev/Playwright http local no se emite).
  * La expiración queda a cargo del JWT (7d); la cookie se emite con el mismo
  * maxAge para persistencia en el navegador.
  */
@@ -85,7 +86,12 @@ export function setSessionCookie(response: NextResponse, token: string): void {
   response.cookies.set(SESSION_COOKIE_NAME, token, {
     path: "/",
     httpOnly: true,
-    sameSite: "lax",
+    // Usamos "strict" para asegurar que la cookie se envíe en TODAS las navegaciones
+    // del mismo sitio, lo cual es crítico para que el middleware reconozca la sesión
+    // al navegar desde "/" a "/historial" en el flujo E2E. "lax" solo envía la cookie
+    // en navegaciones top-level con mismo origen, lo cual a veces falla en contextos de test.
+    sameSite: "strict",
+    secure: process.env.NODE_ENV === "production",
     maxAge: JWT_EXPIRES_IN_SECONDS,
   });
 }
@@ -97,7 +103,8 @@ export function clearSessionCookie(response: NextResponse): void {
   response.cookies.set(SESSION_COOKIE_NAME, "", {
     path: "/",
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: "strict",
+    secure: process.env.NODE_ENV === "production",
     maxAge: 0,
   });
 }

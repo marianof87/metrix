@@ -117,3 +117,17 @@ export const margenInputSchema = z
     path: ["comisionPct"],
   });
 export type MargenInputSchema = z.infer<typeof margenInputSchema>;
+
+// --- auth (Fase 5b) ---
+export const registerSchema = z.object({
+  email: z.string().trim().toLowerCase().email().max(160),
+  name: z.string().trim().max(80).optional().nullable(),
+  password: z.string().min(8).max(128),
+});
+export type RegisterSchema = z.infer<typeof registerSchema>;
+
+export const loginSchema = z.object({
+  email: z.string().trim().toLowerCase().email().max(160),
+  password: z.string().min(1).max(128),
+});
+export type LoginSchema = z.infer<typeof loginSchema>;
