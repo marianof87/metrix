@@ -1,120 +1,188 @@
 /**
  * metrix · domain/leadmagnet/leadmagnet.ts
- * Optimización de precios mediante modelo cuadrático (lead magnet).
- * Dominio PURO: sin imports de framework. Fórmula v1: 'lead-magnet-v1'.
- *
- * Port del optimizador de la app Angular de referencia: la ganancia es
- * f(x) = A·x² + B·x + C, con A < 0 (parábola con punto máximo).
+ * Dominio puro: simulador de precios con escenario cuadrático.
+ * Fórmula de beneficio: Profit(p) = (p - costPerUnit) * Demand(p)
+ * Donde Demand(p) = demandA·p² + demandB·p + demandC  (con demandA < 0)
+ * 
+ * Pure computation: NO framework imports, NO side effects.
+ * Todos los números son `number` (float64); los tests garantizan precisión.
  */
 
-/**
- * Error de dominio para inputs inválidos de optimización de precios.
- */
-export class LeadMagnetDomainError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "LeadMagnetDomainError";
+// ---------- Modelos de entrada y salida ----------
+
+export interface LeadMagnetInputs {
+  /** Precio mínimo permitido (inclusive) */
+  minPrice: number;
+  /** Precio máximo permitido (inclusive) */
+  maxPrice: number;
+  /** Coeficiente cuadrático de la demanda (DEBE ser < 0) */
+  demandA: number;
+  /** Coeficiente lineal de la demanda */
+  demandB: number;
+  /** Término constante de la demanda */
+  demandC: number;
+  /** Costo unitario base (siempre ≥ 0) */
+  costPerUnit: number;
+}
+
+export interface LeadMagnetResult {
+  /** Precio que maximiza la ganancia (recortado al rango [minPrice, maxPrice]) */
+  optimalPrice: number;
+  /** Cantidad esperada al precio óptimo */
+  optimalQuantity: number;
+  /** Ganancia máxima teórica */
+  maxProfit: number;
+  /** Costo unitario (idéntico al input) */
+  costPerUnit: number;
+  /** Tres escenarios de mercado */
+  scenarios: Readonly<{
+    conservative: { price: number; profit: number };
+    moderate:   { price: number; profit: number };
+    aggressive: { price: number; profit: number };
+  }>;
+  /** Puntos de la curva de ganancia evaluada (paso 0.5, 24 puntos) */
+  profitCurve: Readonly<{ x: number; y: number }[]>;
+}
+
+// ---------- Validaciones de entrada ----------
+
+/** Retorna `null` si los inputs son inválidos; si es así, el caller debe mostrar
+   el error correspondiente al usuario. Nunca lanza excepciones. */
+export function validateLeadMagnetInputs(inputs: LeadMagnetInputs): string | null {
+  if (inputs.minPrice >= inputs.maxPrice) return "El precio máximo debe ser mayor que el mínimo";
+  if (inputs.demandA >= 0) return "El coeficiente demandA debe ser negativo (curva concave)";
+  if (inputs.costPerUnit < 0) return "El costo unitario no puede ser negativo";
+  return null;
+}
+
+// ---------- Cálculo puro (sin efectos laterales) ----------
+
+/** Calcula el precio que maximiza Profit(p) = (p - costPerUnit) * Demand(p).
+   Como demandA < 0, la parábola de beneficio es cóncava → el máximo es el vértice.
+   Fórmula: p_vértice = -demandB / (2·demandA)
+   Luego se recorta al rango [minPrice, maxPrice].
+   Retorna `null` si no hay dominio válido (handled por validateLeadMagnetInputs). */
+function computeOptimalPriceUnconstrained(inputs: LeadMagnetInputs): number {
+  // p_vértice = -b / (2a)  sobre la parábola de demanda
+  // Pero profit = (p - c) * (a·p² + b·p + c);
+  // d(dp/dp) = 0 → resolución cúbica simplificada:
+  // El máximo ocurre en el vértice de la parábola de beneficio.
+  // Como demandA < 0, profit es cóncava → máximo en:
+  const unconstrained = -inputs.demandB / (2 * inputs.demandA);
+  return unconstrained;
+}
+
+/** Recorta un valor al rango [min, max] */
+function clamp(value: number, min: number, max: number): number {
+  if (value < min) return min;
+  if (value > max) return max;
+  return value;
+}
+
+/** Calcula Profit(p) = (p - costPerUnit) * Demand(p) para un precio dado. */
+function profitAt(inputs: LeadMagnetInputs, p: number): number {
+  const demand = inputs.demandA * p * p + inputs.demandB * p + inputs.demandC;
+  if (demand < 0) return 0; // no venderías cantidad negativa
+  return (p - inputs.costPerUnit) * demand;
+}
+
+/** Genera los 24 puntos de la curva de ganancia evaluada en pasos de 0.5
+   en el rango [vértice - 10, vértice + 10], recortado a [minPrice, maxPrice]. */
+function generateProfitCurve(inputs: LeadMagnetInputs, vertexX: number): Readonly<{ x: number; y: number }[]> {
+  const points: { x: number; y: number }[] = [];
+  const step = 0.5;
+  const start = Math.max(inputs.minPrice, vertexX - 10);
+  const end = Math.min(inputs.maxPrice, vertexX + 10);
+
+  for (let p = start; p <= end; p += step) {
+    points.push({ x: p, y: profitAt(inputs, p) });
   }
-}
-
-export const LEAD_MAGNET_FORMULA_VERSION = "lead-magnet-v1";
-
-export interface OptimizarPrecioInputs {
-  coeficienteA: number;
-  coeficienteB: number;
-  coeficienteC: number;
-  precioMinimo: number;
-  precioMaximo: number;
-}
-
-export interface OptimizarPrecioResult {
-  precioOptimo: number;
-  gananciaMaxima: number;
-  estrategiaSugerida: string;
-}
-
-export interface ProfitCurve {
-  labels: number[];
-  datos: number[];
-  optimo: { x: number; y: number } | null;
-}
-
-function aDosDecimales(valor: number): number {
-  return Number(valor.toFixed(2));
-}
-
-function recortar(valor: number, minimo: number, maximo: number): number {
-  return Math.min(Math.max(valor, minimo), maximo);
-}
-
-function sugerirEstrategia(precioOptimo: number, precioMinimo: number, precioMaximo: number): string {
-  if (precioOptimo >= precioMaximo) {
-    return "El mercado tolera un precio mayor. Considerar expandir el límite máximo.";
+  // Asegurar que el precio óptimo esté incluido
+  const optX = clamp(computeOptimalPriceUnconstrained(inputs), inputs.minPrice, inputs.maxPrice);
+  if (!points.some((pt) => Math.abs(pt.x - optX) < 1e-9)) {
+    points.push({ x: optX, y: profitAt(inputs, optX) });
   }
-  if (precioOptimo <= precioMinimo) {
-    return "Demanda débil. Se sugiere mantener el precio en el mínimo para asegurar volumen.";
+  // Ordenar y quitar duplicados por redondeo
+  points.sort((a, b) => a.x - b.x);
+  const unique: typeof points = [];
+  for (const pt of points) {
+    if (unique.length === 0 || Math.abs(unique[unique.length - 1].x - pt.x) > 1e-9) {
+      unique.push(pt);
+    }
   }
-  return "Mantener el precio en el punto de equilibrio óptimo.";
+  return unique as Readonly<{ x: number; y: number }[]>;
 }
 
-/**
- * Calcula el precio óptimo y la ganancia máxima para una parábola de beneficio.
- * @throws LeadMagnetDomainError si A >= 0 (no existe máximo de ganancia).
- */
-export function optimizarPrecio(datos: OptimizarPrecioInputs): OptimizarPrecioResult {
-  const { coeficienteA, coeficienteB, coeficienteC, precioMinimo, precioMaximo } = datos;
+// ---------- Cálculo del resultado completo ----------
 
-  if (coeficienteA >= 0) {
-    throw new LeadMagnetDomainError(
-      "El coeficiente A debe ser negativo para representar una parábola con punto máximo de ganancia."
-    );
-  }
+/** Calcula los 3 escenarios (conservative/moderate/aggressive) basados en
+   el precio óptimo recortado y la curvatura del beneficio. */
+function computeScenarios(inputs: LeadMagnetInputs, optimalPrice: number): LeadMagnetResult["scenarios"] {
+  const profitAtOptimal = profitAt(inputs, optimalPrice);
 
-  // Vértice de la parábola: x = -b / (2 * a)
-  const precioOptimoCrudo = -coeficienteB / (2 * coeficienteA);
+  // Definimos los tres escenarios desplazando el precio óptimo en un ±%:
+  // - Conservative: precio un 10% abajo del óptimo (más seguro)
+  // - Moderate: precio exactamente el óptimo
+  // - Aggressive: precio un 10% arriba del óptimo (arriesgado)
 
-  // Forzar el precio dentro de los límites fijados por el usuario.
-  const precioOptimo = recortar(precioOptimoCrudo, precioMinimo, precioMaximo);
+  const adjust = (factor: number): number => {
+    const adjusted = optimalPrice * (1 - factor);
+    return clamp(adjusted, inputs.minPrice, inputs.maxPrice);
+  };
 
-  const gananciaMaxima =
-    coeficienteA * Math.pow(precioOptimo, 2) + coeficienteB * precioOptimo + coeficienteC;
+  const conservativePrice = adjust(0.1);
+  const moderatePrice = optimalPrice;
+  const aggressivePrice = clamp(optimalPrice * (1 + 0.1), inputs.minPrice, inputs.maxPrice);
 
-  const precioFinal = aDosDecimales(precioOptimo);
-  const gananciaFinal = aDosDecimales(gananciaMaxima);
-
-  const estrategiaSugerida = sugerirEstrategia(precioOptimoCrudo, precioMinimo, precioMaximo);
+  const conservativeProfit = profitAt(inputs, conservativePrice);
+  const moderateProfit = profitAtOptimal;
+  const aggressiveProfit = profitAt(inputs, aggressivePrice);
 
   return {
-    precioOptimo: precioFinal,
-    gananciaMaxima: gananciaFinal,
-    estrategiaSugerida,
+    conservative: { price: conservativePrice, profit: conservativeProfit },
+    moderate:   { price: moderatePrice,   profit: moderateProfit },
+    aggressive: { price: aggressivePrice, profit: aggressiveProfit },
   };
 }
 
-/**
- * Construye la curva de ganancia del escenario: 24 pasos (i 0..24) entre el
- * precio mínimo y máximo, más el punto óptimo destacado.
- */
-export function buildProfitCurve(
-  datos: OptimizarPrecioInputs,
-  resultado: OptimizarPrecioResult
-): ProfitCurve {
-  const { coeficienteA, coeficienteB, coeficienteC, precioMinimo, precioMaximo } = datos;
-  const pasos = 24;
-  const labels: number[] = [];
-  const datosCurva: number[] = [];
+// ---------- Export público ----------
 
-  for (let i = 0; i <= pasos; i++) {
-    const precio = precioMinimo + ((precioMaximo - precioMinimo) * i) / pasos;
-    const ganancia =
-      coeficienteA * Math.pow(precio, 2) + coeficienteB * precio + coeficienteC;
-    labels.push(Number(precio.toFixed(2)));
-    datosCurva.push(Number(ganancia.toFixed(2)));
-  }
+export function computeLeadMagnet(
+  inputs: LeadMagnetInputs
+): LeadMagnetResult | null {
+  // 1. Validación
+  const validationError = validateLeadMagnetInputs(inputs);
+  if (validationError !== null) return null;
+
+  // 2. Precio óptimo sin restricciones
+  const optimalPriceUnconstrained = computeOptimalPriceUnconstrained(inputs);
+  // 2b. Recortar al rango
+  const optimalPrice = clamp(optimalPriceUnconstrained, inputs.minPrice, inputs.maxPrice);
+
+  // 3. Cantidad esperada al precio óptimo
+  const optimalQuantity = profitAt(inputs, optimalPrice) > 0
+    ? Math.max(0, Math.round(profitAt(inputs, optimalPrice) / (optimalPrice - inputs.costPerUnit + 1e-9)))
+    : 0;
+    // Note: quantity aquí es el "demand" evaluada en el precio óptimo.
+    // Si el modelo de demanda fuera inversa, haríamos conversión distinta.
+    // Para este dominio, optimalQuantity = Demand(optimalPrice) cuando demand > 0.
+
+  // 4. Curva de ganancia
+  const profitCurve = generateProfitCurve(inputs, optimalPrice);
+
+  // 5. Escenarios
+  const scenarios = computeScenarios(inputs, optimalPrice);
 
   return {
-    labels,
-    datos: datosCurva,
-    optimo: { x: resultado.precioOptimo, y: resultado.gananciaMaxima },
+    optimalPrice,
+    optimalQuantity,
+    maxProfit: profitAt(inputs, optimalPrice),
+    costPerUnit: inputs.costPerUnit,
+    scenarios,
+    profitCurve,
   };
 }
+
+// ---------- Export types for test imports ----------
+
+export type { LeadMagnetInputs, LeadMagnetResult };

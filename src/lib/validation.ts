@@ -71,11 +71,12 @@ export type SaveScenarioSchema = z.infer<typeof saveScenarioSchema>;
 // --- lead-magnet ---
 export const leadMagnetInputSchema = z
   .object({
-    coeficienteA: z.number().finite(),
-    coeficienteB: z.number().finite(),
-    coeficienteC: z.number().finite(),
-    precioMinimo: z.number().finite().nonnegative(),
-    precioMaximo: z.number().finite().positive(),
+    coeficienteA: z.number().finite().default(-1),
+    coeficienteB: z.number().finite().default(0),
+    coeficienteC: z.number().finite().default(100),
+    precioMinimo: z.number().finite().nonnegative().default(10),
+    precioMaximo: z.number().finite().positive().default(100),
+    costPerUnit: z.number().finite().nonnegative().default(5),
   })
   .refine((v) => v.coeficienteA < 0, {
     message: "Coeficiente A debe ser negativo",

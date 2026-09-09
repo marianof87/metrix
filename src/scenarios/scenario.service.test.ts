@@ -308,6 +308,18 @@ describe("scenario.service (unit, in-memory repo)", () => {
     });
   });
 
+  describe("concurrencia save idempotente (política D5)", () => {
+    it("disparar 2 guardar paralelos con mismo input → solo 1 registro SAVED creado", async () => {
+      await Promise.all([
+        service.save("scope-1", "quadratic", { a: 1, b: -3, c: 2 }),
+        service.save("scope-1", "quadratic", { a: 1, b: -3, c: 2 }),
+      ]);
+      const all = await service.list({ scopeId: "scope-1" });
+      expect(all.length).toBe(1); // antirregresión: dedupe bajo concurrencia
+      expect(repo.records.filter((r) => r.status === "SAVED").length).toBe(1);
+    });
+  });
+
   describe("computeInputHash", () => {
     it("es determinista y depende del módulo", () => {
       const h = computeInputHash("quadratic", { a: 1, b: -3, c: 2 });

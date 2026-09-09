@@ -45,7 +45,32 @@ export function computeInputHash(module: ScenarioModule, inputs: Record<string, 
 }
 
 export class ScenarioService {
-  constructor(private readonly repo: ScenarioRepoPort = new PrismaScenarioRepo()) {}
+  private readonly repo: ScenarioRepoPort;
+  // Locks por scopeId+module para serializar saves concurrentes y evitar races en dedupe.
+  private pendingSaves: Map<string, Promise<ScenarioRecord>> = new Map();
+
+  constructor(repo: ScenarioRepoPort = new PrismaScenarioRepo()) {
+    this.repo = repo;
+  }
+
+  private async getLockKey(scopeId: string, module: ScenarioModule): string {
+    return `${scopeId}:${module}`;
+  }
+
+  private async withLock<T>(scopeId: string, module: ScenarioModule, fn: () => Promise<T>): Promise<T> {
+    const key = this.getLockKey(scopeId, module);
+    const existing = this.pendingSaves.get(key);
+    if (existing) {
+      return existing; // Espera la operación en progreso
+    }
+    const promise = fn();
+    this.pendingSaves.set(key, promise);
+    try {
+      return await promise;
+    } finally {
+      this.pendingSaves.delete(key);
+    }
+  }
 
   private async compute(record: ScenarioRecord): Promise<Record<string, unknown>> {
     const fn = moduleComputers[record.module];
@@ -111,47 +136,49 @@ export class ScenarioService {
    * Si el inputHash ya existe en estado SAVED, no duplica y devuelve el existente.
    */
   async save(scopeId: string, module: ScenarioModule, inputs: Record<string, unknown>): Promise<ScenarioRecord> {
-    const inputHash = computeInputHash(module, inputs);
-    // Dedupe por estado: si ya existe un SAVED con este input, no duplicar.
-    const existingSaved = await this.repo.findByUniqueKey(scopeId, module, inputHash, "SAVED");
-    if (existingSaved) {
-      return existingSaved;
-    }
-    // Puede existir un DRAFT/COMPUTED/RE_RUN con el mismo input; si no es SAVED
-    // se reutiliza (sin duplicar su estado), salvo que sea RE_RUN (se conserva).
-    const existing = await this.repo.findByUniqueKey(scopeId, module, inputHash);
-    if (existing && existing.status !== "RE_RUN") {
-      const outputs = await this.compute(existing);
-      const from = existing.status;
-      const record = await this.repo.updateStatus(existing.id, "SAVED", outputs);
-      await this.repo.createAudit({
-        scenarioId: record.id,
-        fromStatus: from,
-        toStatus: "SAVED",
-        action: "SAVE",
-      });
+    return this.withLock(scopeId, module, async () => {
+      const inputHash = computeInputHash(module, inputs);
+      // Dedupe por estado: si ya existe un SAVED con este input, no duplicar.
+      const existingSaved = await this.repo.findByUniqueKey(scopeId, module, inputHash, "SAVED");
+      if (existingSaved) {
+        return existingSaved;
+      }
+      // Puede existir un DRAFT/COMPUTED/RE_RUN con el mismo input; si no es SAVED
+      // se reutiliza (sin duplicar su estado), salvo que sea RE_RUN (se conserva).
+      const existing = await this.repo.findByUniqueKey(scopeId, module, inputHash);
+      if (existing && existing.status !== "RE_RUN") {
+        const outputs = await this.compute(existing);
+        const from = existing.status;
+        const record = await this.repo.updateStatus(existing.id, "SAVED", outputs);
+        await this.repo.createAudit({
+          scenarioId: record.id,
+          fromStatus: from,
+          toStatus: "SAVED",
+          action: "SAVE",
+        });
+        return record;
+      }
+      // No existe SAVED: si el único existente es RE_RUN, NO se reutiliza
+      // (auditoría inmutable, D4): se crea un registro nuevo SAVED.
+      let record: ScenarioRecord;
+      if (existing && existing.status === "RE_RUN") {
+        record = await this.create(scopeId, module, inputs, { forceNew: true });
+      } else {
+        record = existing ?? (await this.create(scopeId, module, inputs));
+      }
+      if (record.status !== "SAVED") {
+        const outputs = await this.compute(record);
+        const from = record.status;
+        record = await this.repo.updateStatus(record.id, "SAVED", outputs);
+        await this.repo.createAudit({
+          scenarioId: record.id,
+          fromStatus: from,
+          toStatus: "SAVED",
+          action: "SAVE",
+        });
+      }
       return record;
-    }
-    // No existe SAVED: si el único existente es RE_RUN, NO se reutiliza
-    // (auditoría inmutable, D4): se crea un registro nuevo SAVED.
-    let record: ScenarioRecord;
-    if (existing && existing.status === "RE_RUN") {
-      record = await this.create(scopeId, module, inputs, { forceNew: true });
-    } else {
-      record = existing ?? (await this.create(scopeId, module, inputs));
-    }
-    if (record.status !== "SAVED") {
-      const outputs = await this.compute(record);
-      const from = record.status;
-      record = await this.repo.updateStatus(record.id, "SAVED", outputs);
-      await this.repo.createAudit({
-        scenarioId: record.id,
-        fromStatus: from,
-        toStatus: "SAVED",
-        action: "SAVE",
-      });
-    }
-    return record;
+    });
   }
 
   /**

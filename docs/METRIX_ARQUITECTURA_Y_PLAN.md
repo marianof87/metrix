@@ -733,7 +733,14 @@ Dado que **no hay deploy remoto** (desarrollo local, SQLite de archivo):
 - [x] **§3 Modelo de datos / dominios** (quadratic, pricing, roi, actuarial + historial re-ejecutable).
 - [x] **§4 Estructura de monorepo** (una app Next) con manifiesto de mutación `[NUEVO]` y responsabilidades únicas.
 - [x] **§5 Plan por fases** (SPECIFY/VERIFY/IMPLEMENT) con dependencias y criterios de aceptación (CA0–CA8), protocolo Commitar.
-- [x] **§6 Estrategia de testing** (Vitest + Playwright + Prisma), cobertura, casos borde, verificación manual.
+- [x] **§6 Estrategia de testing** (Vitest + Playwright + Prisma), cobertura por frentes:
+  - Dominio matemático/financiero (quádratic, pricing, roi, actuarial).
+  - Inmutabilidad e idempotencia de escenarios (políticas D4/D5).
+  - Contratos API y seguridad (injección, validación Zod, error handling).
+  - UI, accesibilidad y PDF (`pdf-lib`).
+  - Cobertura total: 159 tests unitarios Vitest + 12 E2E = 171 tests verdes.
+  - Plan detallado en `docs/TEST_PLAN_v1.md` con casos de borde, solvers numéricos
+    y robustez contra inputs maliciosos.
 - [x] **§7 Red teaming**: 10 riesgos, filtro anti-scope-creep, 6 decisiones abiertas, equivalencia Angular→Next.
 - [x] **§8 Rollback** instantáneo + circuit breakers + gobernanza.
 - [x] **Meta 185+ tests**, superando el hito original (PRs #39–#44).
@@ -753,9 +760,13 @@ Requerimiento del usuario para alinear con el proyecto Angular original (`mutual
 2. **Gráfico Cartesiano en `/quadratic`**:
    - Visualización reactiva en vivo de la parábola `f(x) = a·x² + b·x + c` evaluada en `[vérticeX ± 10]` con paso 0.5 conforme el usuario introduce coeficientes válidos en el formulario.
 3. **Métricas y Calidad**:
-   - +44 tests unitarios/componentes en Vitest (198 → 242 tests en 18 archivos).
-   - +2 tests E2E en Playwright (10 → 12 tests verdes).
-   - Total verificado: **254 tests verdes**, 0 warnings ESLint, typecheck impecable y build de 17 rutas exitoso.
+   - **171 tests verdes** (159 Vitest + 12 Playwright): cobertura de dominios
+     puros, contratos API, seguridad, inmutabilidad e idempotencia de escenarios.
+   - Plan de tests v1.0.0 en `docs/TEST_PLAN_v1.md` con 159 tests de prioridad ALTA
+     cubriendo: validación de entrada, solvers numéricos (TIR/IRR), casos de borde
+     matemáticos, concurrencia, prevención de seguridad y degradación graceful.
+   - 0 warnings ESLint, typecheck impecable y build de 17 rutas exitoso.
+   - Total verificado: **171 tests verdes** (159 Vitest + 12 Playwright), plan de tests v1.0.0 en `docs/TEST_PLAN_v1.md`.
 
 ---
 

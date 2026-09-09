@@ -1,0 +1,84 @@
+
+[1m[46m RUN [49m[22m [36mv3.2.7 [39m[90mC:/Users/PC/Documents/metrix[39m
+
+[90mstdout[2m | src/app/api/v1/api.contract.test.ts
+[22m[39m◇ injected env (1) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+
+ [31m❯[39m src/app/api/v1/api.contract.test.ts [2m([22m[2m28 tests[22m[2m | [22m[31m2 failed[39m[2m)[22m[32m 60[2mms[22m[39m
+   [32m✓[39m api/v1/quadratic[2m > [22mPOST válido → 200 con shape de resultado[32m 6[2mms[22m[39m
+   [32m✓[39m api/v1/quadratic[2m > [22ma=0 → 400 con mensaje claro[32m 1[2mms[22m[39m
+   [32m✓[39m api/v1/quadratic[2m > [22minput inválido (missing c) → 400 Zod[32m 1[2mms[22m[39m
+   [32m✓[39m api/v1/quadratic[2m > [22ma no numérico → 400[32m 0[2mms[22m[39m
+   [32m✓[39m api/v1/quadratic[2m > [22msampleStep = 0 → 400 Zod (debe ser positive)[32m 1[2mms[22m[39m
+   [32m✓[39m api/v1/pricing[2m > [22mPOST válido → 200 y sugerencia de precio[32m 1[2mms[22m[39m
+   [32m✓[39m api/v1/pricing[2m > [22mmargin >= 1 → 400[32m 0[2mms[22m[39m
+   [32m✓[39m api/v1/pricing[2m > [22mbaseCost negativo → 400[32m 0[2mms[22m[39m
+   [32m✓[39m api/v1/pricing[2m > [22mdiscountPct > 1 → 400[32m 0[2mms[22m[39m
+   [32m✓[39m api/v1/roi[2m > [22mPOST válido (simple) → 200 con roiPct[32m 1[2mms[22m[39m
+   [32m✓[39m api/v1/roi[2m > [22minitialInvestment=0 → 400[32m 0[2mms[22m[39m
+   [32m✓[39m api/v1/roi[2m > [22mflujo de caja inválido (period 0) → 400 Zod[32m 1[2mms[22m[39m
+   [32m✓[39m api/v1/roi[2m > [22mperiods = 0 → 400 Zod (debe ser int positive)[32m 0[2mms[22m[39m
+   [32m✓[39m api/v1/actuarial[2m > [22mPOST válido → 200 con compoundAmount[32m 1[2mms[22m[39m
+   [32m✓[39m api/v1/actuarial[2m > [22mperiodsPerYear=0 → 400[32m 0[2mms[22m[39m
+   [32m✓[39m api/v1/actuarial[2m > [22mtasa >= 1 → 400[32m 0[2mms[22m[39m
+   [32m✓[39m api/v1/actuarial[2m > [22myears negativo → 400[32m 0[2mms[22m[39m
+   [32m✓[39m api/v1/actuarial[2m > [22mmortalityProbability > 1 → 400[32m 0[2mms[22m[39m
+   [32m✓[39m api/v1/scenarios[2m > [22mGET /scenarios/:id inexistente → 404[32m 5[2mms[22m[39m
+   [32m✓[39m api/v1/scenarios[2m > [22mPOST válido → 201 con scenario.id, status SAVED y shape consistente[32m 18[2mms[22m[39m
+   [32m✓[39m api/v1/scenarios[2m > [22mPOST con module inválido → 400 Zod[32m 0[2mms[22m[39m
+[31m   [31m×[31m api/v1/lead-magnet[2m > [22mPOST válido → 200 con precio, ganancia, formulaVersion y curva[39m[32m 6[2mms[22m[39m
+[31m     → expected 500 to be 200 // Object.is equality[39m
+   [32m✓[39m api/v1/lead-magnet[2m > [22mA=2 → 400[32m 0[2mms[22m[39m
+   [32m✓[39m api/v1/lead-magnet[2m > [22mmax <= min → 400[32m 0[2mms[22m[39m
+[31m   [31m×[31m api/v1/lead-magnet[2m > [22mmissing campo → 400[39m[32m 1[2mms[22m[39m
+[31m     → expected 500 to be 400 // Object.is equality[39m
+   [32m✓[39m api/v1/leads[2m > [22mPOST válido → 201 con id y createdAt[32m 4[2mms[22m[39m
+   [32m✓[39m api/v1/leads[2m > [22memail inválido → 400[32m 0[2mms[22m[39m
+   [32m✓[39m api/v1/leads[2m > [22mnombre vacío → 400[32m 0[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 2 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m src/app/api/v1/api.contract.test.ts[2m > [22mapi/v1/lead-magnet[2m > [22mPOST válido → 200 con precio, ganancia, formulaVersion y curva
+[31m[1mAssertionError[22m: expected 500 to be 200 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 200[39m
+[31m+ 500[39m
+
+[36m [2m❯[22m src/app/api/v1/api.contract.test.ts:[2m222:24[22m[39m
+    [90m220| [39m      precioMaximo[33m:[39m [34m100[39m[33m,[39m
+    [90m221| [39m    })[33m;[39m
+    [90m222| [39m    [34mexpect[39m(res[33m.[39mstatus)[33m.[39m[34mtoBe[39m([34m200[39m)[33m;[39m
+    [90m   | [39m                       [31m^[39m
+    [90m223| [39m    [35mconst[39m data [33m=[39m [35mawait[39m res[33m.[39m[34mjson[39m()[33m;[39m
+    [90m224| [39m    [34mexpect[39m(data[33m.[39mprecioOptimo)[33m.[39m[34mtoBeCloseTo[39m([34m30[39m[33m,[39m [34m2[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/app/api/v1/api.contract.test.ts[2m > [22mapi/v1/lead-magnet[2m > [22mmissing campo → 400
+[31m[1mAssertionError[22m: expected 500 to be 400 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 400[39m
+[31m+ 500[39m
+
+[36m [2m❯[22m src/app/api/v1/api.contract.test.ts:[2m260:24[22m[39m
+    [90m258| [39m      precioMaximo[33m:[39m [34m100[39m[33m,[39m
+    [90m259| [39m    })[33m;[39m
+    [90m260| [39m    [34mexpect[39m(res[33m.[39mstatus)[33m.[39m[34mtoBe[39m([34m400[39m)[33m;[39m
+    [90m   | [39m                       [31m^[39m
+    [90m261| [39m  })[33m;[39m
+    [90m262| [39m})[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m26 passed[39m[22m[90m (28)[39m
+[2m   Start at [22m 19:44:06
+[2m   Duration [22m 934ms[2m (transform 125ms, setup 21ms, collect 246ms, tests 60ms, environment 0ms, prepare 80ms)[22m
+
