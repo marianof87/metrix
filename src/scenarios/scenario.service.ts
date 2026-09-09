@@ -8,7 +8,7 @@
  *   COMPUTED → SAVED (guardar)
  *   SAVED → RE_RUN   (re-ejecutar: crea NUEVO registro con status RE_RUN — política D4)
  *
- * Idempotencia: clave scopeId+module+inputHash evita duplicados al re-ejecutar
+ * Idempotencia: clave userId+module+inputHash evita duplicados al re-ejecutar
  * el mismo escenario (política D5: solo se guarda bajo acción explícita "Guardar").
  */
 
@@ -46,7 +46,7 @@ export function computeInputHash(module: ScenarioModule, inputs: Record<string, 
 
 export class ScenarioService {
   private readonly repo: ScenarioRepoPort;
-  // Locks por scopeId+module para serializar saves concurrentes y evitar races en dedupe.
+  // Locks por userId+module para serializar saves concurrentes y evitar races en dedupe.
   private pendingSaves: Map<string, Promise<ScenarioRecord>> = new Map();
 
   constructor(repo: ScenarioRepoPort = new PrismaScenarioRepo()) {
@@ -98,7 +98,7 @@ export class ScenarioService {
       }
     }
     const record = await this.repo.create({
-      scopeId,
+      userId: scopeId,
       module,
       inputHash,
       formulaVersion: this.formulaVersionFor(module),
@@ -195,7 +195,7 @@ export class ScenarioService {
     }
     // Creamos un registro nuevo con status RE_RUN directamente.
     let record = await this.repo.create({
-      scopeId,
+      userId: scopeId,
       module,
       inputHash,
       formulaVersion: this.formulaVersionFor(module),
@@ -228,7 +228,11 @@ export class ScenarioService {
   }
 
   async list(params: { scopeId?: string; module?: ScenarioModule; status?: ScenarioStatus } = {}) {
-    return this.repo.list(params);
+    return this.repo.list({
+      userId: params.scopeId,
+      module: params.module,
+      status: params.status,
+    });
   }
 
   async getById(id: string): Promise<ScenarioRecord> {

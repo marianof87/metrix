@@ -146,7 +146,7 @@ describe("scenario.service (unit, in-memory repo)", () => {
       const saved = await service.save("scope-a", "roi", { initialInvestment: 100, finalValue: 120 });
       const rerun = await service.reRun("scope-b", "roi", { initialInvestment: 100, finalValue: 120 });
       expect(rerun.status).toBe("RE_RUN");
-      expect(rerun.scopeId).toBe("scope-b");
+      expect(rerun.userId).toBe("scope-b");
       const original = await repo.findById(saved.id);
       expect(original?.status).toBe("SAVED");
     });
@@ -262,7 +262,7 @@ describe("scenario.service (unit, in-memory repo)", () => {
 
     it("computeScenario con módulo desconocido → ScenarioServiceError", async () => {
       await repo.create({
-        scopeId: "scope-1",
+        userId: "scope-1",
         module: "nope" as never,
         inputHash: "h",
         formulaVersion: "v",

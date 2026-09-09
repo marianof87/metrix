@@ -16,11 +16,11 @@ export async function POST(
 
   try {
     const original = await service.getById(id);
-    const scopeId = original.scopeId;
+    const userId = original.userId;
     const moduleParam = original.module;
     const inputs = original.inputs;
 
-    const rerun = await service.reRun(scopeId, moduleParam, inputs);
+    const rerun = await service.reRun(userId, moduleParam, inputs);
     return jsonOk({ scenario: rerun, reRunOf: id }, { status: 201 });
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : "Error re-running scenario", 400);

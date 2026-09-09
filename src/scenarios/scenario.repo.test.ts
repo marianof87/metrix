@@ -23,7 +23,7 @@ beforeEach(async () => {
 describe("scenario.repo (SQLite integration)", () => {
   it("crea un ScenarioRecord y lo recupera por id", async () => {
     const created = await repo.create({
-      scopeId: "scope-int",
+      userId: "scope-int",
       module: "quadratic",
       inputHash: "hash-1",
       formulaVersion: "quadratic-v1",
@@ -36,9 +36,9 @@ describe("scenario.repo (SQLite integration)", () => {
     expect(found?.inputs).toEqual({ a: 1, b: -3, c: 2 });
   });
 
-  it("busca por clave única scopeId+module+inputHash", async () => {
+  it("busca por clave única userId+module+inputHash", async () => {
     await repo.create({
-      scopeId: "scope-int",
+      userId: "scope-int",
       module: "pricing",
       inputHash: "h-shared",
       formulaVersion: "pricing-v1",
@@ -50,16 +50,16 @@ describe("scenario.repo (SQLite integration)", () => {
   });
 
   it("lista filtrado", async () => {
-    await repo.create({ scopeId: "s1", module: "quadratic", inputHash: "q1", formulaVersion: "v", inputs: {} });
-    await repo.create({ scopeId: "s1", module: "pricing", inputHash: "p1", formulaVersion: "v", inputs: {} });
-    const list = await repo.list({ scopeId: "s1", module: "pricing" });
+    await repo.create({ userId: "s1", module: "quadratic", inputHash: "q1", formulaVersion: "v", inputs: {} });
+    await repo.create({ userId: "s1", module: "pricing", inputHash: "p1", formulaVersion: "v", inputs: {} });
+    const list = await repo.list({ userId: "s1", module: "pricing" });
     expect(list).toHaveLength(1);
     expect(list[0].module).toBe("pricing");
   });
 
   it("actualiza estado y outputs preservando inmutabilidad en BD", async () => {
     const created = await repo.create({
-      scopeId: "s1",
+      userId: "s1",
       module: "roi",
       inputHash: "r1",
       formulaVersion: "roi-v1",
@@ -76,7 +76,7 @@ describe("scenario.repo (SQLite integration)", () => {
 
   it("registra audits y los lista cronológicamente", async () => {
     const created = await repo.create({
-      scopeId: "s1",
+      userId: "s1",
       module: "quadratic",
       inputHash: "a1",
       formulaVersion: "v",
@@ -91,14 +91,14 @@ describe("scenario.repo (SQLite integration)", () => {
 
   it("la clave única impide duplicados (violación de constraint si se fuerza)", async () => {
     await repo.create({
-      scopeId: "s1",
+      userId: "s1",
       module: "quadratic",
       inputHash: "dup",
       formulaVersion: "v",
       inputs: {},
     });
     await expect(
-      repo.create({ scopeId: "s1", module: "quadratic", inputHash: "dup", formulaVersion: "v", inputs: {} })
+      repo.create({ userId: "s1", module: "quadratic", inputHash: "dup", formulaVersion: "v", inputs: {} })
     ).rejects.toThrow();
   });
 });

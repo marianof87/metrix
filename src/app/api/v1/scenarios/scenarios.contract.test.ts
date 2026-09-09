@@ -25,13 +25,13 @@ async function call(fn: (req: Request, ctx: unknown) => Promise<Response>, body:
 beforeAll(async () => {
   // Limpia escenarios de prueba creados en corridas anteriores.
   const rows = await prisma.scenarioRecord.findMany({
-    where: { scopeId: { startsWith: "api-test" } },
+    where: { userId: { startsWith: "api-test" } },
     select: { id: true },
   });
   await prisma.auditEntry.deleteMany({
     where: { scenarioId: { in: rows.map((r) => r.id) } },
   });
-  await prisma.scenarioRecord.deleteMany({ where: { scopeId: { startsWith: "api-test" } } });
+  await prisma.scenarioRecord.deleteMany({ where: { userId: { startsWith: "api-test" } } });
 });
 
 afterAll(async () => {
@@ -128,11 +128,11 @@ describe("api/v1/scenarios", () => {
     expect(res.status).toBe(400);
     // El save deja un DRAFT persistido; se limpia para no contaminar la BD.
     const leaked = await prisma.scenarioRecord.findMany({
-      where: { scopeId: "api-test-400" },
+      where: { userId: "api-test-400" },
       select: { id: true },
     });
     await prisma.auditEntry.deleteMany({ where: { scenarioId: { in: leaked.map((r) => r.id) } } });
-    await prisma.scenarioRecord.deleteMany({ where: { scopeId: "api-test-400" } });
+    await prisma.scenarioRecord.deleteMany({ where: { userId: "api-test-400" } });
   });
 
   it("201 shape: la respuesta contiene scenario.id, module, inputs e inputHash", async () => {

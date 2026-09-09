@@ -10,6 +10,10 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./vitest.setup.ts"],
     include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+    // Serialización de archivos: la suite comparte una única BD SQLite
+    // (prisma/dev.db) entre archivos de integración; el paralelismo provoca
+    // carreras entre deleteMany()s de cada archivo (determinismo > velocidad).
+    fileParallelism: false,
     coverage: {
       provider: "v8",
       reportsDirectory: "coverage",

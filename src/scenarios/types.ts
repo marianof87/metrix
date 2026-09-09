@@ -9,7 +9,7 @@ export type ScenarioStatus = "DRAFT" | "COMPUTED" | "SAVED" | "RE_RUN";
 
 export interface ScenarioRecord {
   id: string;
-  scopeId: string;
+  userId: string;
   module: ScenarioModule;
   version: number;
   inputHash: string;

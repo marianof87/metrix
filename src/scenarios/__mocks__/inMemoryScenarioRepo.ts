@@ -12,7 +12,7 @@ export class InMemoryScenarioRepo implements ScenarioRepoPort {
   private seq = 1;
 
   async create(data: {
-    scopeId: string;
+    userId: string;
     module: ScenarioModule;
     version?: number;
     inputHash: string;
@@ -22,7 +22,7 @@ export class InMemoryScenarioRepo implements ScenarioRepoPort {
     const now = new Date();
     const record: ScenarioRecord = {
       id: `scenario-${this.seq++}`,
-      scopeId: data.scopeId,
+      userId: data.userId,
       module: data.module,
       version: data.version ?? 1,
       inputHash: data.inputHash,
@@ -42,22 +42,22 @@ export class InMemoryScenarioRepo implements ScenarioRepoPort {
   }
 
   async findByUniqueKey(
-    scopeId: string,
+    userId: string,
     module: ScenarioModule,
     inputHash: string,
     status?: ScenarioStatus
   ): Promise<ScenarioRecord | null> {
     // Devuelve el más reciente que cumpla (status opcional).
     const matches = this.records
-      .filter((r) => r.scopeId === scopeId && r.module === module && r.inputHash === inputHash)
+      .filter((r) => r.userId === userId && r.module === module && r.inputHash === inputHash)
       .filter((r) => (status ? r.status === status : true))
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
     return matches[0] ?? null;
   }
 
-  async list(params: { scopeId?: string; module?: ScenarioModule; status?: ScenarioStatus } = {}): Promise<ScenarioRecord[]> {
+  async list(params: { userId?: string; module?: ScenarioModule; status?: ScenarioStatus } = {}): Promise<ScenarioRecord[]> {
     return this.records
-      .filter((r) => (params.scopeId ? r.scopeId === params.scopeId : true))
+      .filter((r) => (params.userId ? r.userId === params.userId : true))
       .filter((r) => (params.module ? r.module === params.module : true))
       .filter((r) => (params.status ? r.status === params.status : true))
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());

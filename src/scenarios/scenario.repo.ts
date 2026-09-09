@@ -9,7 +9,7 @@ import { ScenarioModule, ScenarioStatus, ScenarioRecord, AuditEntryRecord } from
 
 function toScenarioRecord(row: {
   id: string;
-  scopeId: string;
+  userId: string;
   module: string;
   version: number;
   inputHash: string;
@@ -22,7 +22,7 @@ function toScenarioRecord(row: {
 }): ScenarioRecord {
   return {
     id: row.id,
-    scopeId: row.scopeId,
+    userId: row.userId,
     module: row.module as ScenarioModule,
     version: row.version,
     inputHash: row.inputHash,
@@ -56,7 +56,7 @@ function toAuditEntry(row: {
 }
 
 export interface CreateScenarioInput {
-  scopeId: string;
+  userId: string;
   module: ScenarioModule;
   version?: number;
   inputHash: string;
@@ -69,17 +69,17 @@ export interface ScenarioRepo {
   findById(id: string): Promise<ScenarioRecord | null>;
   /**
    * Busca por key de idempotencia. `status` opcional: en la BD la unicidad es
-   * (scopeId, module, inputHash, status); pasarlo permite dedupe por estado
+   * (userId, module, inputHash, status); pasarlo permite dedupe por estado
    * (SAVED para save, RE_RUN para reRun).
    */
   findByUniqueKey(
-    scopeId: string,
+    userId: string,
     module: ScenarioModule,
     inputHash: string,
     status?: ScenarioStatus
   ): Promise<ScenarioRecord | null>;
   list(params: {
-    scopeId?: string;
+    userId?: string;
     module?: ScenarioModule;
     status?: ScenarioStatus;
   }): Promise<ScenarioRecord[]>;
@@ -102,7 +102,7 @@ export class PrismaScenarioRepo implements ScenarioRepo {
   async create(data: CreateScenarioInput): Promise<ScenarioRecord> {
     const row = await prisma.scenarioRecord.create({
       data: {
-        scopeId: data.scopeId,
+        userId: data.userId,
         module: data.module,
         version: data.version ?? 1,
         inputHash: data.inputHash,
@@ -121,14 +121,14 @@ export class PrismaScenarioRepo implements ScenarioRepo {
   }
 
   async findByUniqueKey(
-    scopeId: string,
+    userId: string,
     module: ScenarioModule,
     inputHash: string,
     status?: ScenarioStatus
   ): Promise<ScenarioRecord | null> {
     const row = await prisma.scenarioRecord.findFirst({
       where: {
-        scopeId,
+        userId,
         module,
         inputHash,
         ...(status ? { status } : {}),
@@ -139,13 +139,13 @@ export class PrismaScenarioRepo implements ScenarioRepo {
   }
 
   async list(params: {
-    scopeId?: string;
+    userId?: string;
     module?: ScenarioModule;
     status?: ScenarioStatus;
   }): Promise<ScenarioRecord[]> {
     const rows = await prisma.scenarioRecord.findMany({
       where: {
-        scopeId: params.scopeId,
+        userId: params.userId,
         module: params.module,
         status: params.status,
       },

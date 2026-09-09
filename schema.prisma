@@ -1,5 +1,5 @@
 // metrix — Prisma schema
-// Modelo de persistencia: ScenarioRecord + AuditEntry
+// Modelo de persistencia: User + ScenarioRecord + AuditEntry + Lead
 
 generator client {
   provider = "prisma-client-js"
@@ -10,10 +10,22 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/// Usuario de la plataforma (Fase 5a). Los escenarios se asocian por userId.
+/// NOTA T1: por contrato RED (arbitrary userIds sin User previo), la FK física
+/// userId→User.id NO se crea en BD aún; se materializará en T6 (migración real).
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  name         String?
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
 /// Registro de un escenario (cálculo) guardado. Contrato universal del dominio.
 model ScenarioRecord {
   id            String   @id @default(uuid())
-  scopeId       String
+  userId        String
   module        String // 'quadratic' | 'pricing' | 'roi' | 'actuarial'
   version       Int      @default(1)
   inputHash     String
@@ -24,13 +36,13 @@ model ScenarioRecord {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  audits     AuditEntry[]
+  audits        AuditEntry[]
 
-  @@index([scopeId, module])
+  @@index([userId, module])
   @@index([inputHash])
   // Dedupe por estado: SAVED y RE_RUN del mismo input coexisten (política D4/D5:
   // re-ejecutar crea NUEVO registro RE_RUN, pero no duplica dentro de un mismo estado).
-  @@unique([scopeId, module, inputHash, status])
+  @@unique([userId, module, inputHash, status])
 }
 
 /// Auditoría de mutaciones sobre un escenario (transiciones de estado).
