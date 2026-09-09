@@ -48,28 +48,28 @@ así un `SAVED` y un `RE_RUN` del mismo input coexisten.
 
 - `POST /api/v1/{quadratic|pricing|roi|actuarial}` — calcular sin persistir
 - `POST /api/v1/margen` — margen real por unidad, piso de precio, punto de equilibrio y traslado de suba (fórmula v1 `margen-v1`) — **respuesta en formato honesto `Outcome`** (OBJ-2)
-- `POST /api/v1/lead-magnet` — optimizar precio y generar curva de ganancia (lead magnet)
+- `POST /api/v1/lead-magnet` — escenario honesto de precios: `{ formulaVersion: "lead-magnet-v1", outcomes: [Outcome], curva: {x,y}[] }` (OBJ-2; sin `precioOptimo`/`gananciaMaxima` legacy)
 - `POST /api/v1/leads` — persistir contacto para descarga de informe PDF
 - `GET /api/v1/scenarios` — listar (`scopeId`, `module`, `status` como query)
 - `POST /api/v1/scenarios` — guardar un escenario (`{ scopeId, module, inputs }`)
 - `GET /api/v1/scenarios/[id]` — detalle + auditoría
 - `POST /api/v1/scenarios/[id]/re-run` — re-ejecutar (crea `RE_RUN`)
 
-Contrato OpenAPI: `src/app/api/v1/openapi/openapi.json` (incluye `/api/v1/margen` y el schema `Outcome` con `access`).
+Contrato OpenAPI: `src/app/api/v1/openapi/openapi.json` (incluye `/api/v1/margen`, `/api/v1/lead-magnet` y el schema `Outcome` con `access`).
 
 ## Tests
 
 ```bash
-npm test          # 215 tests Vitest (dominio, servicio, contratos API, componentes)
+npm test          # 231 tests Vitest (dominio, servicio, contratos API, componentes)
 npm run test:e2e  # 12 tests Playwright (módulos, lead magnet, gráfico en vivo e historial)
 npm run lint
 npm run typecheck
 npm run build
 ```
 
-Suite actual: **215 tests Vitest — 212 verdes, 3 falls conocidos** (deuda técnica:
-concurrencia en `scenario.service` y 500 de `/api/v1/lead-magnet` por mismatch de
-exports → roadmap Fase 4 de Metrix AI).
+Suite actual: **231 tests Vitest — 231 verdes** + **12 E2E Playwright verdes**
+(Fase 4 de Metrix AI saldó la deuda: bug 500 de `/api/v1/lead-magnet` reparado con
+contrato honesto y el lock de concurrencia de `scenario.service` corregido).
 
 ## OBJ-2 — honestidad antes que precisión
 
@@ -87,7 +87,9 @@ interface Outcome {
 }
 ```
 
-- `POST /api/v1/margen` responde `{ outcomes: Outcome[], formulaVersion }`. La
+- `POST /api/v1/margen` y `POST /api/v1/lead-magnet` responden
+  `{ outcomes: Outcome[], formulaVersion }` (lead-magnet agrega `curva` como serie
+  técnica de visualización). La
   `confidence` es heurística determinística (Fase 1–4 sin infraestructura de
   medición): margen → `"alta"` (todos los drivers vienen del input del usuario);
   lead-magnet → `"media"`/`"baja"` (la demanda es estimada, nunca medida).

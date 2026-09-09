@@ -2,7 +2,7 @@
  * metrix · api contract tests (unit)
  * Prueban los Route Handlers directamente (sin servidor HTTP) para validar
  * el contrato: 200 con shape correcto, 400 con Zod en inputs inválidos.
- * CA4.
+ * CA4 — Fase 4 RED: bloque lead-magnet reescrito a contrato honesto Outcome (OBJ-2).
  */
 
 import { describe, it, expect, afterAll } from "vitest";
@@ -15,6 +15,8 @@ import { GET as getScenarioById } from "@/app/api/v1/scenarios/[id]/route";
 import { POST as leadMagnetPost } from "@/app/api/v1/lead-magnet/route";
 import { POST as leadsPost } from "@/app/api/v1/leads/route";
 import { prisma } from "@/lib/prisma";
+import { sha256Hex } from "@/domain/shared/hash";
+import { canonicalJson } from "@/domain/shared/canonicalJson";
 
 const SAVED_IDS: string[] = [];
 const LEAD_IDS: string[] = [];
@@ -33,6 +35,18 @@ async function call(fn: (req: Request) => Promise<Response>, body: unknown) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   }));
+}
+
+function assertOutcome(o: any) {
+  expect(o.id).toMatch(/^[a-f0-9]{64}$/);
+  expect(Array.isArray(o.range)).toBe(true);
+  expect(o.range).toHaveLength(2);
+  expect(Number.isFinite(o.range[0]) && Number.isFinite(o.range[1])).toBe(true);
+  expect(o.range[0]).toBeLessThanOrEqual(o.range[1]);
+  expect(typeof o.driver === "string" && o.driver.trim().length > 0).toBe(true);
+  expect(typeof o.action === "string" && o.action.trim().length > 0).toBe(true);
+  expect(["baja", "media", "alta"]).toContain(o.confidence);
+  expect(["free", "contact-gated", "paid"]).toContain(o.access);
 }
 
 describe("api/v1/quadratic", () => {
@@ -210,53 +224,141 @@ describe("api/v1/scenarios", () => {
   });
 });
 
-describe("api/v1/lead-magnet", () => {
-  it("POST válido → 200 con precio, ganancia, formulaVersion y curva", async () => {
-    const res = await call(leadMagnetPost, {
-      coeficienteA: -2,
-      coeficienteB: 120,
-      coeficienteC: -1000,
-      precioMinimo: 10,
-      precioMaximo: 100,
-    });
+// ============================================================
+// BLOQUE REESCRITO — api/v1/lead-magnet — contrato honesto OBJ-2
+// ============================================================
+describe("api/v1/lead-magnet — contrato honesto Outcome (OBJ-2) + curva técnica", () => {
+  const validInputs = {
+    minPrice: 10,
+    maxPrice: 100,
+    demandA: -2,
+    demandB: 120,
+    demandC: -1000,
+    costPerUnit: 5,
+  };
+
+  it("POST válido → 200 con formulaVersion lead-magnet-v1, outcomes[0] honesto y curva {x,y}[]", async () => {
+    const res = await call(leadMagnetPost, validInputs);
     expect(res.status).toBe(200);
     const data = await res.json();
-    expect(data.precioOptimo).toBeCloseTo(30, 2);
-    expect(data.gananciaMaxima).toBeCloseTo(800, 2);
+
+    // formulaVersion
     expect(data.formulaVersion).toBe("lead-magnet-v1");
-    expect(data.estrategiaSugerida).toBe("Mantener el precio en el punto de equilibrio óptimo.");
-    expect(data.curva.labels).toHaveLength(25);
+
+    // outcomes: array con exactamente 1 elemento
+    expect(Array.isArray(data.outcomes)).toBe(true);
+    expect(data.outcomes).toHaveLength(1);
+    const o = data.outcomes[0];
+    assertOutcome(o);
+
+    // Valores esperados para este input (vértice -b/(2a)=30, clamp [10,100]=30)
+    // scenarios: conservative 27 (30*0.9), aggressive 33 (30*1.1)
+    expect(o.range[0]).toBeCloseTo(27, 5);
+    expect(o.range[1]).toBeCloseTo(33, 5);
+    expect(o.range[0]).toBeLessThanOrEqual(30);
+    expect(o.range[1]).toBeGreaterThanOrEqual(30);
+    expect(o.range[0]).toBeGreaterThanOrEqual(validInputs.minPrice);
+    expect(o.range[1]).toBeLessThanOrEqual(validInputs.maxPrice);
+    expect(o.driver).toBe("curvatura de la demanda");
+    expect(o.action).toBe("fijar precio de lanzamiento en 30 y monitorear demanda");
+    expect(o.action).toMatch(/30/);
+    expect(o.confidence).toBe("media");
+    expect(o.confidence).not.toBe("alta");
+    expect(o.access).toBe("contact-gated");
+    expect(o.id).toMatch(/^[a-f0-9]{64}$/);
+
+    // Determinismo del id (hash canónico incluye access)
+    const expectedId = sha256Hex(canonicalJson({
+      range: o.range,
+      driver: "curvatura de la demanda",
+      action: "fijar precio de lanzamiento en 30 y monitorear demanda",
+      confidence: "media",
+      access: "contact-gated",
+    }));
+    expect(o.id).toBe(expectedId);
+
+    // curva técnica: {x,y}[] con length > 0, sin shape legacy
+    expect(Array.isArray(data.curva)).toBe(true);
+    expect(data.curva.length).toBeGreaterThan(0);
+    for (const pt of data.curva) {
+      expect(typeof pt.x).toBe("number");
+      expect(typeof pt.y).toBe("number");
+      expect(Number.isFinite(pt.x) && Number.isFinite(pt.y)).toBe(true);
+    }
+    // El precio óptimo debe estar en la curva (o muy cerca)
+    expect(data.curva.some((pt: any) => Math.abs(pt.x - 30) < 1e-6)).toBe(true);
+
+    // OBJ-2: PROHIBIDO shape legacy
+    expect((data as any).precioOptimo).toBeUndefined();
+    expect((data as any).gananciaMaxima).toBeUndefined();
+    expect((data as any).estrategiaSugerida).toBeUndefined();
+    expect((data as any).curva?.labels).toBeUndefined();
+    expect((data as any).curva?.datos).toBeUndefined();
+    expect((data as any).curva?.optimo).toBeUndefined();
+    expect(o.optimalPrice).toBeUndefined();
+    expect(o.maxProfit).toBeUndefined();
   });
 
-  it("A=2 → 400", async () => {
-    const res = await call(leadMagnetPost, {
-      coeficienteA: 2,
-      coeficienteB: 120,
-      coeficienteC: -1000,
-      precioMinimo: 10,
-      precioMaximo: 100,
-    });
+  it("demandA=2 (no negativo) → 400 con Invalid input", async () => {
+    const res = await call(leadMagnetPost, { ...validInputs, demandA: 2 });
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toMatch(/Invalid input/i);
+  });
+
+  it("demandA=0 → 400", async () => {
+    const res = await call(leadMagnetPost, { ...validInputs, demandA: 0 });
     expect(res.status).toBe(400);
   });
 
-  it("max <= min → 400", async () => {
-    const res = await call(leadMagnetPost, {
-      coeficienteA: -2,
-      coeficienteB: 120,
-      coeficienteC: -1000,
-      precioMinimo: 100,
-      precioMaximo: 50,
-    });
+  it("maxPrice <= minPrice → 400", async () => {
+    const res = await call(leadMagnetPost, { ...validInputs, minPrice: 100, maxPrice: 50 });
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toMatch(/Invalid input/i);
+  });
+
+  it("maxPrice === minPrice → 400", async () => {
+    const res = await call(leadMagnetPost, { ...validInputs, minPrice: 50, maxPrice: 50 });
     expect(res.status).toBe(400);
   });
 
-  it("missing campo → 400", async () => {
-    const res = await call(leadMagnetPost, {
-      coeficienteA: -2,
-      coeficienteB: 120,
-      precioMinimo: 10,
-      precioMaximo: 100,
-    });
+  it("costPerUnit=-1 → 400", async () => {
+    const res = await call(leadMagnetPost, { ...validInputs, costPerUnit: -1 });
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toMatch(/Invalid input/i);
+  });
+
+  it("campo faltante (demandC) → 400", async () => {
+    const { demandC: _omit, ...incomplete } = validInputs as any;
+    const res = await call(leadMagnetPost, incomplete);
+    expect(res.status).toBe(400);
+  });
+
+  it("campo faltante (costPerUnit) → 400", async () => {
+    const { costPerUnit: _omit, ...incomplete } = validInputs as any;
+    const res = await call(leadMagnetPost, incomplete);
+    expect(res.status).toBe(400);
+  });
+
+  it("NaN → 400", async () => {
+    const res = await call(leadMagnetPost, { ...validInputs, demandB: NaN });
+    expect(res.status).toBe(400);
+  });
+
+  it("Infinity → 400", async () => {
+    const res = await call(leadMagnetPost, { ...validInputs, minPrice: Infinity });
+    expect(res.status).toBe(400);
+  });
+
+  it("payload vacío → 400", async () => {
+    const res = await call(leadMagnetPost, {});
+    expect(res.status).toBe(400);
+  });
+
+  it("tipo inválido (demandA string) → 400", async () => {
+    const res = await call(leadMagnetPost, { ...validInputs, demandA: "no-numero" as any });
     expect(res.status).toBe(400);
   });
 });

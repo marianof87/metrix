@@ -71,14 +71,16 @@ Objetivo: **gratis si el dueño aportó todos los números; pago si Metrix aport
 
 AC: un escenario de pago queda identificable en el contrato (`access: "free" | "contact-gated" | "paid"`) sin implementar el cobro aún; decisión de niveles documentada por Mariano.
 
-## Fase 4 — MVP-2 consolidado: calculadora + informe desbloqueado
+## Fase 4 — MVP-2 consolidado: calculadora + informe desbloqueado ✅ COMPLETADA (2026-09)
 
 Objetivo: la puerta de entrada gratuita que ya existe, **funcionando y honesta**.
-1. Reparar bug 500 de `lead-magnet` (reconciliar `leadmagnet.ts` vs route: nombre único de API y exports coherentes; actualizar `api.contract.test.ts`, `validation.ts`, `LeadMagnetForm`, `informePdf`).
-2. PDF del informe con el formato `Outcome` (rango+causa+acción), no decimales falsos.
-3. E2E de la demo-scene del dossier (rol dueño, ≤ N pasos).
+1. ✅ Reparar bug 500 de `lead-magnet` (reconciliar `leadmagnet.ts` vs route: nombre único de API y exports coherentes; actualizar `api.contract.test.ts`, `validation.ts`, `LeadMagnetForm`, `informePdf`).
+2. ✅ PDF del informe con el formato `Outcome` (rango+causa+acción), no decimales falsos.
+3. ✅ E2E de la demo-scene del dossier (rol dueño, ≤ N pasos) — 12/12 Playwright verdes.
 
-AC: suite completa verde (unit + contrato + E2E); PDF descargable con un resultado honesto; bug 500 cerrado.
+AC: **suite completa verde (231 Vitest + 12 E2E)**; PDF descargable con un resultado
+honesto; bug 500 cerrado. Extra saldado: lock de concurrencia de `scenario.service`
+(`getLockKey()` async → clave de Map siempre única; ahora síncrono).
 
 ## Fase 5 — MVP-3 (condicionado, postergado)
 
@@ -97,9 +99,13 @@ Curva de demanda **estimada con intervalo de confianza**. Condición del propio 
 
 ## Deuda técnica transversal (a saldar en cualquier fase antes de release)
 
-- Bug 500 `lead-magnet` (mismatch de exports tras sobrescritura).
-- Test de concurrencia en `scenario.service.test.ts` (cubierto por `@@unique` en SQLite; decidir: reescribir test o documentar known issue).
-- Contador de tests/README desactualizado por las sobrescrituras (254 → verificar suite real).
+- ✅ SALDADO (Fase 4): bug 500 `lead-magnet` por mismatch de exports → reparado con contrato honesto (`computeLeadMagnet` + `toLeadMagnetOutcome`).
+- ✅ SALDADO (Fase 4): lock de concurrencia en `scenario.service` — `getLockKey()` era async y se usaba como clave de Map (objeto Promise siempre único); ahora síncrono.
+- ✅ SALDADO (Fase 4): contador de tests/README actualizado → 231 Vitest + 12 E2E, todo verde.
+
+Mejoras menores post-release (hallazgos del AUDIT de Fase 4, no bloquean):
+- O-1: sanitizar caracteres fuera de WinAnsi (emoji/CJK) antes de `drawText` en `informePdf.ts` (texto del lead llega al PDF plano; pdf-lib lanza con charset fuera de Helvetica).
+- O-2: layout del bloque resultados del PDF si la `action` fuera muy larga (el wrap de `dibujarTexto` podría solaparse con el CTA).
 
 ## Metodología por fase (protocolo Commitar)
 

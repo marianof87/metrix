@@ -183,6 +183,65 @@
         }
       }
     },
+    "/api/v1/lead-magnet": {
+      "post": {
+        "summary": "Simulador de precios del lead magnet — salida honesta Outcome (OBJ-2)",
+        "description": "Toma los coeficientes de la curva de demanda y devuelve un rango de precio con causa y acción. Sin números sueltos (precioOptimo/gananciaMaxima quedaron fuera del contrato).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["minPrice", "maxPrice", "demandA", "demandB", "demandC", "costPerUnit"],
+                "properties": {
+                  "minPrice": { "type": "number", "description": "Precio mínimo del barrido" },
+                  "maxPrice": { "type": "number", "description": "Precio máximo (debe ser mayor que minPrice)" },
+                  "demandA": { "type": "number", "description": "Coeficiente cuadrático de la curva de demanda (debe ser < 0)" },
+                  "demandB": { "type": "number" },
+                  "demandC": { "type": "number" },
+                  "costPerUnit": { "type": "number", "minimum": 0 }
+                },
+                "description": "Todos los campos son obligatorios y finitos (Zod). 400 si demandA>=0, maxPrice<=minPrice o costPerUnit<0."
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Outcomes honestos + curva técnica de visualización",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "formulaVersion": { "type": "string", "enum": ["lead-magnet-v1"] },
+                    "outcomes": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Outcome" }
+                    },
+                    "curva": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": ["x", "y"],
+                        "properties": {
+                          "x": { "type": "number" },
+                          "y": { "type": "number" }
+                        }
+                      },
+                      "description": "Serie técnica para el gráfico de ganancia del cliente (data viz; no es un número de decisión)"
+                    }
+                  },
+                  "required": ["formulaVersion", "outcomes", "curva"]
+                }
+              }
+            }
+          },
+          "400": { "description": "Input inválido (Zod con 'Invalid input')" }
+        }
+      }
+    },
     "/api/v1/scenarios": {
       "get": {
         "summary": "Lista escenarios guardados (filtrable por scopeId, module, status)",

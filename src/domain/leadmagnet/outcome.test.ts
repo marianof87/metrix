@@ -97,3 +97,61 @@ describe("domain/leadmagnet/outcome — toLeadMagnetOutcome", () => {
     expect(outcome.driver).toBe("curvatura de la demanda");
   });
 });
+
+/**
+ * Complemento Fase 4 — casos faltantes de toLeadMagnetOutcome.
+ * No duplica los casos ya sellados; solo añade bordes no cubiertos.
+ * Debe PASS en RED (ya existe) y seguir PASS en GREEN.
+ */
+describe("domain/leadmagnet/outcome — complemento Fase 4 (baja confidence, curva, recorte alto)", () => {
+  it("confidence baja cuando optimalQuantity === 0 (demanda no viable al precio óptimo)", () => {
+    // Forzamos cantidad 0: demanda negativa o cero al precio óptimo → profit 0 → quantity 0
+    const inputs: LeadMagnetInputs = { minPrice: 10, maxPrice: 100, demandA: -2, demandB: 0, demandC: 0, costPerUnit: 5 };
+    const result = computeLeadMagnet(inputs)!;
+    expect(result).not.toBeNull();
+    expect(result.optimalQuantity).toBe(0);
+    const outcome = toLeadMagnetOutcome(result, inputs)!;
+    expect(outcome.confidence).toBe("baja");
+    expect(outcome.confidence).not.toBe("alta");
+    expect(outcome.access).toBe("contact-gated");
+    expect(outcome.driver).toBe("curvatura de la demanda");
+  });
+
+  it("access siempre contact-gated incluso con confidence baja", () => {
+    const inputs: LeadMagnetInputs = { minPrice: 10, maxPrice: 100, demandA: -2, demandB: 0, demandC: 0, costPerUnit: 5 };
+    const result = computeLeadMagnet(inputs)!;
+    const outcome = toLeadMagnetOutcome(result, inputs)!;
+    expect(outcome.access).toBe("contact-gated");
+  });
+
+  it("curva técnica no vacía y con pares finitos {x,y} para inputs válidos", () => {
+    const inputs: LeadMagnetInputs = { minPrice: 10, maxPrice: 100, demandA: -2, demandB: 120, demandC: -1000, costPerUnit: 5 };
+    const result = computeLeadMagnet(inputs)!;
+    expect(result.profitCurve.length).toBeGreaterThan(0);
+    for (const pt of result.profitCurve) {
+      expect(Number.isFinite(pt.x)).toBe(true);
+      expect(Number.isFinite(pt.y)).toBe(true);
+    }
+    // El outcome no expone la curva, pero el dominio sí la genera para el endpoint
+    const outcome = toLeadMagnetOutcome(result, inputs)!;
+    expect(outcome.range[0]).toBeLessThanOrEqual(outcome.range[1]);
+  });
+
+  it("optimalPrice recortado a maxPrice → range sigue dentro de [min,max] y contiene max", () => {
+    // vértice 30 pero con maxPrice 25 → optimalPrice recortado a 25
+    const inputs: LeadMagnetInputs = { minPrice: 10, maxPrice: 25, demandA: -2, demandB: 120, demandC: -1000, costPerUnit: 5 };
+    const result = computeLeadMagnet(inputs)!;
+    expect(result.optimalPrice).toBe(25);
+    const outcome = toLeadMagnetOutcome(result, inputs)!;
+    expect(outcome.range[0]).toBeGreaterThanOrEqual(inputs.minPrice);
+    expect(outcome.range[1]).toBeLessThanOrEqual(inputs.maxPrice);
+    expect(outcome.range[1]).toBe(25);
+  });
+
+  it("null-safe con inputs distintos (minPrice>maxPrice) → null sin lanzar", () => {
+    const bad: LeadMagnetInputs = { minPrice: 100, maxPrice: 10, demandA: -1, demandB: 10, demandC: 10, costPerUnit: 5 };
+    const result = computeLeadMagnet(bad);
+    expect(result).toBeNull();
+    expect(toLeadMagnetOutcome(result, bad)).toBeNull();
+  });
+});

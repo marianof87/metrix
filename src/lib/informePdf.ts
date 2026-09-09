@@ -3,14 +3,31 @@
  * Generación del informe PDF del lead magnet con pdf-lib.
  * Port del servicio de la app Angular de referencia (paleta, secciones, nombre de archivo).
  * Solo corre en el navegador.
+ *
+ * Contrato honesto OBJ-2: recibe Outcome (range + action) en lugar de
+ * números sueltos (precioOptimo / gananciaMaxima / estrategiaSugerida).
  */
 
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 
 export interface InformePdfDatos {
   lead: { nombre: string; empresa: string; whatsapp: string; email: string };
-  resultados: { precioOptimo: number; gananciaMaxima: number; estrategiaSugerida: string };
-  coeficientes: { a: number; b: number; c: number };
+  outcome: {
+    id: string;
+    range: [number, number];
+    driver: string;
+    action: string;
+    confidence: string;
+    access: string;
+  };
+  coeficientes: {
+    demandA: number;
+    demandB: number;
+    demandC: number;
+    minPrice: number;
+    maxPrice: number;
+    costPerUnit: number;
+  };
 }
 
 // Paleta de marca — reflejo de los tokens de la app de referencia.
@@ -31,9 +48,23 @@ export function nombreArchivoInforme(empresa: string): string {
 }
 
 /**
+ * Valida que los datos tengan el shape honesto (outcome presente, NO resultados legacy).
+ * Lanza si se pasa el shape legacy.
+ */
+function assertHonestShape(datos: InformePdfDatos): void {
+  if (!datos.outcome) {
+    throw new Error(
+      "InformePdfDatos debe incluir 'outcome' (contrato OBJ-2). El shape legacy 'resultados' ya no es válido."
+    );
+  }
+}
+
+/**
  * Genera el informe en PDF y dispara la descarga en el navegador.
  */
 export async function generarInformePdf(datos: InformePdfDatos): Promise<void> {
+  assertHonestShape(datos);
+
   const documento = await PDFDocument.create();
   const pagina = documento.addPage([ANCHO_PAGINA, ALTO_PAGINA]);
   const fuente = await documento.embedFont(StandardFonts.Helvetica);
@@ -142,44 +173,77 @@ export async function generarInformePdf(datos: InformePdfDatos): Promise<void> {
     ["WhatsApp", datos.lead.whatsapp],
   ]);
 
+  // Escenario simulado — coeficientes honestos (sin defaults legacy).
   dibujarBloque("Escenario simulado", [
-    ["Coeficiente A (sensibilidad)", String(datos.coeficientes.a)],
-    ["Coeficiente B (demanda)", String(datos.coeficientes.b)],
-    ["Coeficiente C (costos fijos)", String(datos.coeficientes.c)],
+    ["demandA (sensibilidad)", String(datos.coeficientes.demandA)],
+    ["demandB (demanda)", String(datos.coeficientes.demandB)],
+    ["demandC (costos fijos)", String(datos.coeficientes.demandC)],
+    ["Precio mínimo", String(datos.coeficientes.minPrice)],
+    ["Precio máximo", String(datos.coeficientes.maxPrice)],
+    ["Costo unitario", String(datos.coeficientes.costPerUnit)],
   ]);
 
-  // Resultados: rect fondo suave con precio y ganancia máxima.
+  // Resultados honestos: rango sugerido + acción + driver + confianza + acceso.
+  const [rangeLo, rangeHi] = datos.outcome.range;
+  const rangeTexto = `Entre $${rangeLo} y $${rangeHi}`;
+
   pagina.drawRectangle({
     x: 48,
-    y: y - 108,
+    y: y - 140,
     width: ANCHO_PAGINA - 96,
-    height: 108,
+    height: 140,
     color: FONDO_SUAVE,
   });
-  pagina.drawText("Precio óptimo sugerido", { x: 72, y: y - 34, size: 11, font: fuente, color: TEXTO_TENUE });
-  pagina.drawText(`$${datos.resultados.precioOptimo.toFixed(2)}`, {
+
+  // Rango sugerido
+  pagina.drawText("Rango de precio sugerido", { x: 72, y: y - 24, size: 11, font: fuente, color: TEXTO_TENUE });
+  pagina.drawText(rangeTexto, {
     x: 72,
-    y: y - 64,
-    size: 26,
+    y: y - 50,
+    size: 22,
     font: fuenteNegrita,
     color: TEXTO_OSCURO,
   });
-  const xGanancia = ANCHO_PAGINA / 2 + 24;
-  pagina.drawText("Ganancia máxima estimada", { x: xGanancia, y: y - 34, size: 11, font: fuente, color: TEXTO_TENUE });
-  pagina.drawText(`$${datos.resultados.gananciaMaxima.toFixed(2)}`, {
-    x: xGanancia,
-    y: y - 64,
-    size: 26,
-    font: fuenteNegrita,
-    color: AZUL_CLARO,
-  });
-  y -= 132;
 
-  // Estrategia recomendada con wrap de línea.
-  pagina.drawText("Estrategia recomendada", { x: 48, y, size: 13, font: fuenteNegrita, color: AZUL_PRIMARIO });
-  y -= 22;
-  y = dibujarTexto(datos.resultados.estrategiaSugerida, 48, y, 11, TEXTO_OSCURO);
+  // Acción recomendada
+  const xAccion = ANCHO_PAGINA / 2 + 24;
+  pagina.drawText("Acción recomendada", { x: xAccion, y: y - 24, size: 11, font: fuente, color: TEXTO_TENUE });
+  y = dibujarTexto(datos.outcome.action, xAccion, y - 48, 11, TEXTO_OSCURO);
+
+  y -= 16;
+
+  // Driver
+  pagina.drawText("Driver", { x: 72, y, size: 11, font: fuente, color: TEXTO_TENUE });
+  pagina.drawText(datos.outcome.driver, {
+    x: 200,
+    y,
+    size: 11,
+    font: fuenteNegrita,
+    color: TEXTO_OSCURO,
+  });
   y -= 20;
+
+  // Confianza
+  pagina.drawText("Nivel de confianza", { x: 72, y, size: 11, font: fuente, color: TEXTO_TENUE });
+  pagina.drawText(datos.outcome.confidence, {
+    x: 200,
+    y,
+    size: 11,
+    font: fuenteNegrita,
+    color: TEXTO_OSCURO,
+  });
+  y -= 20;
+
+  // Acceso
+  pagina.drawText("Acceso", { x: 72, y, size: 11, font: fuente, color: TEXTO_TENUE });
+  pagina.drawText(datos.outcome.access, {
+    x: 200,
+    y,
+    size: 11,
+    font: fuenteNegrita,
+    color: TEXTO_OSCURO,
+  });
+  y -= 32;
 
   // CTA azul.
   pagina.drawRectangle({

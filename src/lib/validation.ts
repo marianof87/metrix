@@ -68,23 +68,27 @@ export const saveScenarioSchema = z.object({
 });
 export type SaveScenarioSchema = z.infer<typeof saveScenarioSchema>;
 
-// --- lead-magnet ---
+// --- lead-magnet (contrato honesto OBJ-2) ---
 export const leadMagnetInputSchema = z
   .object({
-    coeficienteA: z.number().finite().default(-1),
-    coeficienteB: z.number().finite().default(0),
-    coeficienteC: z.number().finite().default(100),
-    precioMinimo: z.number().finite().nonnegative().default(10),
-    precioMaximo: z.number().finite().positive().default(100),
-    costPerUnit: z.number().finite().nonnegative().default(5),
+    minPrice: z.number().finite(),
+    maxPrice: z.number().finite(),
+    demandA: z.number().finite(),
+    demandB: z.number().finite(),
+    demandC: z.number().finite(),
+    costPerUnit: z.number().finite(),
   })
-  .refine((v) => v.coeficienteA < 0, {
-    message: "Coeficiente A debe ser negativo",
-    path: ["coeficienteA"],
+  .refine((v) => v.demandA < 0, {
+    message: "Invalid input",
+    path: ["demandA"],
   })
-  .refine((v) => v.precioMaximo > v.precioMinimo, {
-    message: "El precio máximo debe ser mayor que el mínimo",
-    path: ["precioMaximo"],
+  .refine((v) => v.maxPrice > v.minPrice, {
+    message: "Invalid input",
+    path: ["maxPrice"],
+  })
+  .refine((v) => v.costPerUnit >= 0, {
+    message: "Invalid input",
+    path: ["costPerUnit"],
   });
 export type LeadMagnetInputSchema = z.infer<typeof leadMagnetInputSchema>;
 

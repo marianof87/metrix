@@ -3,7 +3,7 @@
 /**
  * metrix · components/LeadMagnetForm.tsx
  * Simulador de precios del lead magnet: inputs, cálculo, curva de ganancia
- * y descarga del informe PDF.
+ * y descarga del informe PDF. Contrato honesto OBJ-2.
  */
 
 import { useState } from "react";
@@ -12,18 +12,12 @@ import LeadModal from "./LeadModal";
 import { generarInformePdf } from "@/lib/informePdf";
 import type { LeadInputSchema } from "@/lib/validation";
 
-interface LeadMagnetCurva {
-  labels: number[];
-  datos: number[];
-  optimo: { x: number; y: number } | null;
-}
+import type { Outcome } from "@/domain/shared/outcome";
 
 interface LeadMagnetResult {
   formulaVersion: string;
-  precioOptimo: number;
-  gananciaMaxima: number;
-  estrategiaSugerida: string;
-  curva: LeadMagnetCurva;
+  outcomes: Outcome[];
+  curva: { x: number; y: number }[];
 }
 
 const DEFAULTS: Record<string, string> = {
@@ -32,6 +26,7 @@ const DEFAULTS: Record<string, string> = {
   c: "-1000",
   min: "10",
   max: "100",
+  cost: "5",
 };
 
 const CAMPOS = [
@@ -65,15 +60,13 @@ const CAMPOS = [
     placeholder: "Ej. 100",
     testid: "lm-max",
   },
+  {
+    key: "cost",
+    label: "Costo unitario ($)",
+    placeholder: "Ej. 5",
+    testid: "lm-cost",
+  },
 ];
-
-function indiceMasCercano(valores: number[], objetivo: number): number {
-  return valores.reduce(
-    (mejor, valor, indice) =>
-      Math.abs(valor - objetivo) < Math.abs(valores[mejor] - objetivo) ? indice : mejor,
-    0
-  );
-}
 
 export default function LeadMagnetForm() {
   const [values, setValues] = useState<Record<string, string>>(DEFAULTS);
@@ -94,11 +87,12 @@ export default function LeadMagnetForm() {
     setIsLoading(true);
     try {
       const inputs = {
-        coeficienteA: Number(values.a),
-        coeficienteB: Number(values.b),
-        coeficienteC: Number(values.c),
-        precioMinimo: Number(values.min),
-        precioMaximo: Number(values.max),
+        demandA: Number(values.a),
+        demandB: Number(values.b),
+        demandC: Number(values.c),
+        minPrice: Number(values.min),
+        maxPrice: Number(values.max),
+        costPerUnit: Number(values.cost),
       };
       const res = await fetch("/api/v1/lead-magnet", {
         method: "POST",
@@ -115,7 +109,7 @@ export default function LeadMagnetForm() {
       }
       setResult(data as LeadMagnetResult);
     } catch {
-      setError("No se pudo conectar con el servidor. Intente nuevamente.");
+      setError("No se pudo conectar");
       setResult(null);
     } finally {
       setIsLoading(false);
@@ -125,6 +119,8 @@ export default function LeadMagnetForm() {
   const handleRegistrado = async (lead: LeadInputSchema) => {
     setModalAbierto(false);
     if (!result) return;
+    const outcome = result.outcomes[0];
+    if (!outcome) return;
     try {
       await generarInformePdf({
         lead: {
@@ -133,15 +129,14 @@ export default function LeadMagnetForm() {
           whatsapp: lead.whatsapp,
           email: lead.email,
         },
-        resultados: {
-          precioOptimo: result.precioOptimo,
-          gananciaMaxima: result.gananciaMaxima,
-          estrategiaSugerida: result.estrategiaSugerida,
-        },
+        outcome,
         coeficientes: {
-          a: Number(values.a),
-          b: Number(values.b),
-          c: Number(values.c),
+          demandA: Number(values.a),
+          demandB: Number(values.b),
+          demandC: Number(values.c),
+          minPrice: Number(values.min),
+          maxPrice: Number(values.max),
+          costPerUnit: Number(values.cost),
         },
       });
       setMensajeExito(`Informe generado. Te contactamos a ${lead.email} en breve.`);
@@ -150,10 +145,11 @@ export default function LeadMagnetForm() {
     }
   };
 
-  const highlightIndex =
-    result && result.curva.optimo && result.curva.labels.length > 0
-      ? indiceMasCercano(result.curva.labels, result.curva.optimo.x)
-      : undefined;
+  const outcome = result?.outcomes[0] ?? null;
+
+  // Mapear curva {x,y}[] → labels/datos para ProfitChart
+  const chartLabels = result?.curva.map((pt) => pt.x) ?? [];
+  const chartDatos = result?.curva.map((pt) => pt.y) ?? [];
 
   return (
     <div>
@@ -204,39 +200,46 @@ export default function LeadMagnetForm() {
 
         <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
           <h2 className="text-lg font-semibold">Tu escenario en números</h2>
-          {!result ? (
+          {!outcome ? (
             <p data-testid="lm-empty" className="py-8 text-center text-sm text-zinc-500">
               Ajustá los parámetros para ver tu escenario inicial.
             </p>
           ) : (
             <div className="mt-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="rounded-lg bg-zinc-50 p-4">
-                  <span className="text-sm text-zinc-500">Precio óptimo sugerido</span>
-                  <strong className="mt-1 block text-2xl text-zinc-900">
-                    $ {result.precioOptimo}
-                  </strong>
-                </div>
-                <div className="rounded-lg bg-zinc-50 p-4">
-                  <span className="text-sm text-zinc-500">Ganancia máxima estimada</span>
-                  <strong className="mt-1 block text-2xl text-cyan-500">
-                    $ {result.gananciaMaxima}
-                  </strong>
-                </div>
+              {/* Rango honesto */}
+              <div className="rounded-lg bg-zinc-50 p-4">
+                <span className="text-sm text-zinc-500">Rango de precio sugerido</span>
+                <strong data-testid="lm-range" className="mt-1 block text-2xl text-zinc-900">
+                  ${outcome.range[0]} – ${outcome.range[1]}
+                </strong>
               </div>
 
-              <div className="mt-5 rounded-lg border-l-4 border-zinc-300 bg-blue-50 p-4">
-                <span className="text-sm font-semibold text-zinc-900">
-                  Estrategia recomendada
-                </span>
-                <p className="mt-1 text-sm text-zinc-600">{result.estrategiaSugerida}</p>
+              {/* Acción */}
+              <div className="mt-4 rounded-lg border-l-4 border-zinc-300 bg-blue-50 p-4">
+                <span className="text-sm font-semibold text-zinc-900">Acción recomendada</span>
+                <p data-testid="lm-action" className="mt-1 text-sm text-zinc-600">{outcome.action}</p>
+              </div>
+
+              {/* Driver, Confidence, Access */}
+              <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
+                <div className="rounded-lg bg-zinc-50 p-3">
+                  <span className="text-zinc-500">Driver</span>
+                  <p data-testid="lm-driver" className="mt-0.5 font-medium text-zinc-800">{outcome.driver}</p>
+                </div>
+                <div className="rounded-lg bg-zinc-50 p-3">
+                  <span className="text-zinc-500">Confianza</span>
+                  <p data-testid="lm-confidence" className="mt-0.5 font-medium text-zinc-800">{outcome.confidence}</p>
+                </div>
+                <div className="rounded-lg bg-zinc-50 p-3">
+                  <span className="text-zinc-500">Acceso</span>
+                  <p data-testid="lm-access" className="mt-0.5 font-medium text-zinc-800">{outcome.access}</p>
+                </div>
               </div>
 
               <div className="mt-5">
                 <ProfitChart
-                  labels={result.curva.labels}
-                  datos={result.curva.datos}
-                  highlightIndex={highlightIndex}
+                  labels={chartLabels}
+                  datos={chartDatos}
                 />
               </div>
 

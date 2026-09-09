@@ -53,7 +53,7 @@ export class ScenarioService {
     this.repo = repo;
   }
 
-  private async getLockKey(scopeId: string, module: ScenarioModule): string {
+  private getLockKey(scopeId: string, module: ScenarioModule): string {
     return `${scopeId}:${module}`;
   }
 

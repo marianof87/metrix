@@ -1,42 +1,36 @@
 import { NextResponse } from "next/server";
-import {
-  optimizarPrecio,
-  buildProfitCurve,
-  LEAD_MAGNET_FORMULA_VERSION,
-} from "@/domain/leadmagnet/leadmagnet";
+import { computeLeadMagnet } from "@/domain/leadmagnet/leadmagnet";
+import { toLeadMagnetOutcome } from "@/domain/leadmagnet/outcome";
 import { leadMagnetInputSchema } from "@/lib/validation";
 import { readJsonBody, handleApiError, jsonError } from "@/lib/api";
 
+/**
+ * POST /api/v1/lead-magnet — Fase 4 (contrato honesto OBJ-2)
+ * Devuelve { formulaVersion, outcomes: [Outcome], curva: {x,y}[] }
+ * en lugar del shape legacy (precioOptimo, gananciaMaxima, estrategiaSugerida).
+ */
 export async function POST(request: Request) {
+  const body = await readJsonBody(request);
+  if (!body.ok) return body.error;
+  const parsed = leadMagnetInputSchema.safeParse(body.data);
+  if (!parsed.success) {
+    return jsonError("Invalid input", 400, parsed.error.flatten());
+  }
   try {
-    const body = await readJsonBody(request);
-    if (!body.ok) return NextResponse.json({ error: body.error }, { status: body.statusCode ?? 500 });
-    const parsed = leadMagnetInputSchema.safeParse(body.data);
-    if (!parsed.success) {
-      return jsonError("Invalid input", 400, parsed.error.flatten());
+    const result = computeLeadMagnet(parsed.data);
+    if (!result) {
+      return jsonError("Invalid input", 400);
     }
-    try {
-      const resultado = optimizarPrecio(parsed.data);
-      const curva = buildProfitCurve(parsed.data, resultado);
-      return NextResponse.json({
-        formulaVersion: LEAD_MAGNET_FORMULA_VERSION,
-        precioOptimo: resultado.precioOptimo,
-        gananciaMaxima: resultado.gananciaMaxima,
-        estrategiaSugerida: resultado.estrategiaSugerida,
-        curva,
-      });
-    } catch (error: any) {
-      console.error("lead-magnet handler error:", error);
-      return NextResponse.json(
-        { error: error.message ?? "Error interno del servidor" },
-        { status: 500 }
-      );
+    const outcome = toLeadMagnetOutcome(result, parsed.data);
+    if (!outcome) {
+      return jsonError("Invalid input", 400);
     }
-  } catch (error: any) {
-    console.error("lead-magnet handler outer error:", error);
-    return NextResponse.json(
-      { error: error.message ?? "Error interno del servidor" },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      formulaVersion: "lead-magnet-v1",
+      outcomes: [outcome],
+      curva: result.profitCurve,
+    });
+  } catch (error) {
+    return handleApiError(error);
   }
 }
