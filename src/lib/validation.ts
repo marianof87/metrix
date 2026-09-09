@@ -96,3 +96,20 @@ export const leadSchema = z.object({
   email: z.string().trim().email().max(120),
 });
 export type LeadInputSchema = z.infer<typeof leadSchema>;
+
+// --- margen (T1 de Metrix AI) ---
+export const margenInputSchema = z
+  .object({
+    precioVenta: z.number().finite().positive(),
+    comisionPct: z.number().finite().min(0).lt(1),
+    mermaPct: z.number().finite().min(0).lt(1),
+    ivaPct: z.number().finite().min(0).lt(1),
+    fleteUnitario: z.number().finite().nonnegative(),
+    costoUnitario: z.number().finite().nonnegative(),
+    costosFijosMensuales: z.number().finite().nonnegative().optional(),
+  })
+  .refine((v) => v.comisionPct + v.mermaPct + v.ivaPct < 1 - 1e-9, {
+    message: "la suma de comisionPct + mermaPct + ivaPct debe ser menor que 1",
+    path: ["comisionPct"],
+  });
+export type MargenInputSchema = z.infer<typeof margenInputSchema>;

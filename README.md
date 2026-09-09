@@ -47,6 +47,7 @@ así un `SAVED` y un `RE_RUN` del mismo input coexisten.
 ## API
 
 - `POST /api/v1/{quadratic|pricing|roi|actuarial}` — calcular sin persistir
+- `POST /api/v1/margen` — margen real por unidad, piso de precio, punto de equilibrio y traslado de suba (fórmula v1 `margen-v1`)
 - `POST /api/v1/lead-magnet` — optimizar precio y generar curva de ganancia (lead magnet)
 - `POST /api/v1/leads` — persistir contacto para descarga de informe PDF
 - `GET /api/v1/scenarios` — listar (`scopeId`, `module`, `status` como query)
@@ -54,19 +55,21 @@ así un `SAVED` y un `RE_RUN` del mismo input coexisten.
 - `GET /api/v1/scenarios/[id]` — detalle + auditoría
 - `POST /api/v1/scenarios/[id]/re-run` — re-ejecutar (crea `RE_RUN`)
 
-Contrato OpenAPI: `src/app/api/v1/openapi/openapi.json`.
+Contrato OpenAPI: `src/app/api/v1/openapi/openapi.json` (margen pendiente de incorporar).
 
 ## Tests
 
 ```bash
-npm test          # 242 tests Vitest (dominio, servicio, contratos API, componentes)
+npm test          # 175 tests Vitest (dominio, servicio, contratos API, componentes)
 npm run test:e2e  # 12 tests Playwright (módulos, lead magnet, gráfico en vivo e historial)
 npm run lint
 npm run typecheck
 npm run build
 ```
 
-Suite total: **254 tests verdes** (242 unit + 12 E2E).
+Suite actual: **175 tests Vitest — 172 verdes, 3 falls conocidos** (deuda técnica:
+concurrencia en `scenario.service` y 500 de `/api/v1/lead-magnet` por mismatch de
+exports → roadmap Fase 4 de Metrix AI).
 
 ## Estructura
 
