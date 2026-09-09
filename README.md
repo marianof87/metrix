@@ -47,7 +47,7 @@ así un `SAVED` y un `RE_RUN` del mismo input coexisten.
 ## API
 
 - `POST /api/v1/{quadratic|pricing|roi|actuarial}` — calcular sin persistir
-- `POST /api/v1/margen` — margen real por unidad, piso de precio, punto de equilibrio y traslado de suba (fórmula v1 `margen-v1`)
+- `POST /api/v1/margen` — margen real por unidad, piso de precio, punto de equilibrio y traslado de suba (fórmula v1 `margen-v1`) — **respuesta en formato honesto `Outcome`** (OBJ-2)
 - `POST /api/v1/lead-magnet` — optimizar precio y generar curva de ganancia (lead magnet)
 - `POST /api/v1/leads` — persistir contacto para descarga de informe PDF
 - `GET /api/v1/scenarios` — listar (`scopeId`, `module`, `status` como query)
@@ -67,9 +67,30 @@ npm run typecheck
 npm run build
 ```
 
-Suite actual: **175 tests Vitest — 172 verdes, 3 falls conocidos** (deuda técnica:
+Suite actual: **206 tests Vitest — 203 verdes, 3 falls conocidos** (deuda técnica:
 concurrencia en `scenario.service` y 500 de `/api/v1/lead-magnet` por mismatch de
 exports → roadmap Fase 4 de Metrix AI).
+
+## OBJ-2 — honestidad antes que precisión
+
+Desde la Fase 2 de Metrix AI, **ninguna salida de producto es un número falso con
+decimales**. Todo resultado se expresa como un `Outcome`:
+
+```ts
+interface Outcome {
+  id: string;                    // hash canónico determinista del contenido
+  range: [number, number];       // intervalo honesto [min, max]
+  driver: string;                // la causa principal del resultado (castellano)
+  action: string;                // una acción concreta, no un dato (castellano)
+  confidence: "baja" | "media" | "alta";
+}
+```
+
+- `POST /api/v1/margen` responde `{ outcomes: Outcome[], formulaVersion }`. La
+  `confidence` es heurística determinística (Fase 1–4 sin infraestructura de
+  medición): margen → `"alta"` (todos los drivers vienen del input del usuario);
+  lead-magnet → `"media"`/`"baja"` (la demanda es estimada, nunca medida).
+- Contrato OpenAPI: `src/app/api/v1/openapi/openapi.json` (schema `Outcome`).
 
 ## Estructura
 

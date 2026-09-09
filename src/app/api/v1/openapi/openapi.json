@@ -135,6 +135,54 @@
         }
       }
     },
+    "/api/v1/margen": {
+      "post": {
+        "summary": "Margen real por unidad, piso y equilibrio — salida honesta Outcome (OBJ-2)",
+        "description": "Ninguna salida es un número falso con decimales: la respuesta es un intervalo con causa y acción.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["precioVenta", "comisionPct", "mermaPct", "ivaPct", "fleteUnitario", "costoUnitario"],
+                "properties": {
+                  "precioVenta": { "type": "number", "exclusiveMinimum": 0 },
+                  "comisionPct": { "type": "number", "minimum": 0, "exclusiveMaximum": 1 },
+                  "mermaPct": { "type": "number", "minimum": 0, "exclusiveMaximum": 1 },
+                  "ivaPct": { "type": "number", "minimum": 0, "exclusiveMaximum": 1 },
+                  "fleteUnitario": { "type": "number", "minimum": 0 },
+                  "costoUnitario": { "type": "number", "minimum": 0 },
+                  "costosFijosMensuales": { "type": "number", "minimum": 0 }
+                },
+                "description": "comisionPct + mermaPct + ivaPct debe ser < 1 (refine Zod con tolerancia float)"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Outcomes honestos (OBJ-2). Sin números sueltos a nivel raíz.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "outcomes": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Outcome" }
+                    },
+                    "formulaVersion": { "type": "string" }
+                  },
+                  "required": ["outcomes"]
+                }
+              }
+            }
+          },
+          "400": { "description": "Input inválido (Zod con 'Invalid input')" }
+        }
+      }
+    },
     "/api/v1/scenarios": {
       "get": {
         "summary": "Lista escenarios guardados (filtrable por scopeId, module, status)",
@@ -192,6 +240,27 @@
         "responses": {
           "201": { "description": "Nuevo registro RE_RUN" },
           "400": { "description": "No se pudo re-ejecutar" }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Outcome": {
+        "type": "object",
+        "required": ["id", "range", "driver", "action", "confidence"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-f0-9]{64}$", "description": "Hash canónico del contenido (determinista)" },
+          "range": {
+            "type": "array",
+            "items": { "type": "number" },
+            "minItems": 2,
+            "maxItems": 2,
+            "description": "Intervalo honesto [min, max]"
+          },
+          "driver": { "type": "string", "description": "La causa principal del resultado (castellano)" },
+          "action": { "type": "string", "description": "Una acción concreta, no un dato (castellano)" },
+          "confidence": { "type": "string", "enum": ["baja", "media", "alta"] }
         }
       }
     }
