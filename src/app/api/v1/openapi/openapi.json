@@ -3,7 +3,7 @@
   "info": {
     "title": "metrix API",
     "version": "0.1.0",
-    "description": "API v1 del proyecto metrix — calculadoras cuadrática, precios, ROI y actuarial + historial de escenarios re-ejecutable."
+    "description": "API v1 de Metrix AI — calculadoras (cuadrática, precios, ROI, actuarial) + margen honesto (OBJ-2: toda salida es Outcome con range+driver+action+confidence) + historial de escenarios. Frontera gratis/pago (OBJ-1): cada Outcome lleva access."
   },
   "paths": {
     "/api/v1/quadratic": {
@@ -248,9 +248,9 @@
     "schemas": {
       "Outcome": {
         "type": "object",
-        "required": ["id", "range", "driver", "action", "confidence"],
+        "required": ["id", "range", "driver", "action", "confidence", "access"],
         "properties": {
-          "id": { "type": "string", "pattern": "^[a-f0-9]{64}$", "description": "Hash canónico del contenido (determinista)" },
+          "id": { "type": "string", "pattern": "^[a-f0-9]{64}$", "description": "Hash canónico del contenido (determinista; incluye access)" },
           "range": {
             "type": "array",
             "items": { "type": "number" },
@@ -260,7 +260,12 @@
           },
           "driver": { "type": "string", "description": "La causa principal del resultado (castellano)" },
           "action": { "type": "string", "description": "Una acción concreta, no un dato (castellano)" },
-          "confidence": { "type": "string", "enum": ["baja", "media", "alta"] }
+          "confidence": { "type": "string", "enum": ["baja", "media", "alta"] },
+          "access": {
+            "type": "string",
+            "enum": ["free", "contact-gated", "paid"],
+            "description": "OBJ-1 — free si todos los drivers salen de inputs del dueño; contact-gated si se desbloquea con contacto; paid si Metrix aportó un número que el dueño no tenía (cobro no implementado; niveles = decisión de Mariano)"
+          }
         }
       }
     }

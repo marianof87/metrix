@@ -11,6 +11,7 @@ function assertHonest(o: any) {
   expect(typeof o.driver === "string" && o.driver.trim().length > 0).toBe(true);
   expect(typeof o.action === "string" && o.action.trim().length > 0).toBe(true);
   expect(["baja","media","alta"]).toContain(o.confidence);
+  expect(["free","contact-gated","paid"]).toContain(o.access);
 }
 
 describe("domain/margen/outcome — toMargenOutcomes", () => {
@@ -22,6 +23,7 @@ describe("domain/margen/outcome — toMargenOutcomes", () => {
     const main = outcomes[0];
     assertHonest(main);
     expect(main.confidence).toBe("alta");
+    expect(main.access).toBe("free");
     expect(main.range[0]).toBeLessThanOrEqual(result.margenRealUnitario);
     expect(main.range[1]).toBeGreaterThanOrEqual(result.margenRealUnitario);
     // amplitud honesta: no intervalo gigante inventado
@@ -35,6 +37,7 @@ describe("domain/margen/outcome — toMargenOutcomes", () => {
     const [main] = toMargenOutcomes(result, inputs);
     expect(main.driver.toLowerCase()).toMatch(/comisi/);
     expect(main.action.toLowerCase()).toMatch(/renegociar|comisi/);
+    expect(main.access).toBe("free");
   });
 
   it("driver dominante: costo unitario pesa más → driver costo y action bajar costo", () => {
@@ -43,6 +46,7 @@ describe("domain/margen/outcome — toMargenOutcomes", () => {
     const [main] = toMargenOutcomes(result, inputs);
     expect(main.driver.toLowerCase()).toMatch(/costo/);
     expect(main.action.toLowerCase()).toMatch(/costo|adquisici/);
+    expect(main.access).toBe("free");
   });
 
   it("margen negativo → driver honesto y action concreta subir precio / bajar costo (no dato)", () => {
@@ -51,6 +55,7 @@ describe("domain/margen/outcome — toMargenOutcomes", () => {
     expect(result.puedeCubrirCostos).toBe(false);
     const [main] = toMargenOutcomes(result, inputs);
     assertHonest(main);
+    expect(main.access).toBe("free");
     expect(main.range[0]).toBeLessThanOrEqual(result.margenRealUnitario);
     // action debe ser verbo concreto, no un número
     expect(main.action.toLowerCase()).toMatch(/subir precio|bajar costo|renegociar|revisar/);
@@ -62,6 +67,7 @@ describe("domain/margen/outcome — toMargenOutcomes", () => {
     const result = calcularMargenReal(inputs); // margen 0
     const [main] = toMargenOutcomes(result, inputs);
     assertHonest(main);
+    expect(main.access).toBe("free");
     expect(main.range[0]).toBeLessThanOrEqual(0);
     expect(main.range[1]).toBeGreaterThanOrEqual(0);
   });
@@ -71,6 +77,7 @@ describe("domain/margen/outcome — toMargenOutcomes", () => {
     const result = calcularMargenReal(inputs);
     const outcomes = toMargenOutcomes(result, inputs);
     expect(outcomes[0].driver.toLowerCase()).toMatch(/costo/);
+    expect(outcomes[0].access).toBe("free");
     expect(outcomes[0].range[0]).toBeLessThanOrEqual(40);
   });
 
@@ -80,6 +87,7 @@ describe("domain/margen/outcome — toMargenOutcomes", () => {
     const [main] = toMargenOutcomes(result, inputs);
     expect(main.driver.toLowerCase()).toMatch(/flete/);
     expect(main.action.toLowerCase()).toMatch(/flete/);
+    expect(main.access).toBe("free");
   });
 
   it("determinismo: mismos (result,inputs) → mismos ids", () => {
@@ -89,6 +97,7 @@ describe("domain/margen/outcome — toMargenOutcomes", () => {
     const b = toMargenOutcomes(result, inputs);
     expect(a).toEqual(b);
     expect(a[0].id).toBe(b[0].id);
+    expect(a[0].access).toBe("free");
   });
 
   it("inputs distintos → id distinto", () => {
@@ -105,5 +114,16 @@ describe("domain/margen/outcome — toMargenOutcomes", () => {
     const [main] = toMargenOutcomes(result, inputs);
     expect((main as any).margenRealUnitario).toBeUndefined();
     expect((main as any).precioVenta).toBeUndefined();
+    expect(main.access).toBe("free");
+  });
+
+  it("frontera gratis/pago: todos los outcomes de margen tienen access free (drivers 100% inputs usuario)", () => {
+    const inputs: MargenInputs = { precioVenta: 100, costoUnitario: 60, comisionPct: 0.1, mermaPct: 0.05, ivaPct: 0.21, fleteUnitario: 10 };
+    const result = calcularMargenReal(inputs);
+    const outcomes = toMargenOutcomes(result, inputs);
+    for (const o of outcomes) {
+      expect(o.access).toBe("free");
+      expect(["free","contact-gated","paid"]).toContain(o.access);
+    }
   });
 });

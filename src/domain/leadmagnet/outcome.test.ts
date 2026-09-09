@@ -10,6 +10,7 @@ describe("domain/leadmagnet/outcome — toLeadMagnetOutcome", () => {
     const outcome = toLeadMagnetOutcome(result, baseInputs)!;
     expect(outcome).not.toBeNull();
     expect(outcome!.id).toMatch(/^[a-f0-9]{64}$/);
+    expect(outcome!.access).toBe("contact-gated");
     expect(outcome!.range[0]).toBeLessThanOrEqual(outcome!.range[1]);
     expect(outcome!.range[0]).toBeGreaterThanOrEqual(baseInputs.minPrice);
     expect(outcome!.range[1]).toBeLessThanOrEqual(baseInputs.maxPrice);
@@ -24,6 +25,7 @@ describe("domain/leadmagnet/outcome — toLeadMagnetOutcome", () => {
     const outcome = toLeadMagnetOutcome(result, baseInputs)!;
     expect(["media","baja"]).toContain(outcome.confidence);
     expect(outcome.confidence).not.toBe("alta");
+    expect(outcome.access).toBe("contact-gated");
   });
 
   it("driver en castellano no vacío (demanda o costo)", () => {
@@ -31,13 +33,16 @@ describe("domain/leadmagnet/outcome — toLeadMagnetOutcome", () => {
     const outcome = toLeadMagnetOutcome(result, baseInputs)!;
     expect(outcome.driver.trim().length).toBeGreaterThan(3);
     expect(outcome.driver.toLowerCase()).toMatch(/demanda|curvatura|costo/);
+    expect(outcome.driver).toBe("curvatura de la demanda");
+    expect(outcome.access).toBe("contact-gated");
   });
 
   it("action concreta contiene fijar precio y optimalPrice", () => {
     const result = computeLeadMagnet(baseInputs)!;
     const outcome = toLeadMagnetOutcome(result, baseInputs)!;
     expect(outcome.action.toLowerCase()).toMatch(/fijar|monitorear|validar|lanzamiento/);
-    expect(outcome.action).toMatch(String(Math.round(result.optimalPrice)));
+    expect(outcome.action).toBe(`fijar precio de lanzamiento en ${Math.round(result.optimalPrice)} y monitorear demanda`);
+    expect(outcome.access).toBe("contact-gated");
   });
 
   it("result null (inputs inválidos) → retorna null honesto", () => {
@@ -54,6 +59,7 @@ describe("domain/leadmagnet/outcome — toLeadMagnetOutcome", () => {
     const b = toLeadMagnetOutcome(result, baseInputs)!;
     expect(a.id).toBe(b.id);
     expect(a).toEqual(b);
+    expect(a.access).toBe("contact-gated");
   });
 
   it("inputs distintos → id distinto", () => {
@@ -72,6 +78,7 @@ describe("domain/leadmagnet/outcome — toLeadMagnetOutcome", () => {
     const outcome = toLeadMagnetOutcome(result, inputs)!;
     expect(outcome.range[0]).toBeGreaterThanOrEqual(inputs.minPrice);
     expect(outcome.range[1]).toBeLessThanOrEqual(inputs.maxPrice);
+    expect(outcome.access).toBe("contact-gated");
   });
 
   it("no expone números falsos sueltos: Outcome no tiene optimalPrice como campo suelto", () => {
@@ -79,5 +86,14 @@ describe("domain/leadmagnet/outcome — toLeadMagnetOutcome", () => {
     const outcome = toLeadMagnetOutcome(result, baseInputs)!;
     expect((outcome as any).optimalPrice).toBeUndefined();
     expect((outcome as any).maxProfit).toBeUndefined();
+    expect(outcome.access).toBe("contact-gated");
+  });
+
+  it("frontera gratis/pago: outcome no-null tiene access contact-gated (driver estimado por sistema → paid-eligible, desbloqueo por contacto MVP-2)", () => {
+    const result = computeLeadMagnet(baseInputs)!;
+    const outcome = toLeadMagnetOutcome(result, baseInputs)!;
+    expect(outcome.access).toBe("contact-gated");
+    expect(["free","contact-gated","paid"]).toContain(outcome.access);
+    expect(outcome.driver).toBe("curvatura de la demanda");
   });
 });

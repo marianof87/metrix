@@ -1,6 +1,6 @@
 /**
  * metrix · domain/leadmagnet/outcome.ts
- * Adaptador Fase 2: traduce LeadMagnetResult + LeadMagnetInputs → Outcome | null.
+ * Adaptador Fase 2/3: traduce LeadMagnetResult + LeadMagnetInputs → Outcome | null.
  * Dominio PURO: sin imports de framework (ni @/lib ni rutas de app).
  *
  * === Decisiones de diseño documentadas ===
@@ -56,5 +56,6 @@ export function toLeadMagnetOutcome(
     driver: "curvatura de la demanda",
     action: `fijar precio de lanzamiento en ${Math.round(result.optimalPrice)} y monitorear demanda`,
     confidence,
+    access: "contact-gated",
   });
 }

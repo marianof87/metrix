@@ -1,7 +1,8 @@
 /**
- * metrix · api contract tests — margen (OBJ-2: formato honesto Outcome)
+ * metrix · api contract tests — margen (OBJ-2: formato honesto Outcome · OBJ-1: access)
  * Contrato POST /api/v1/margen — 200 con { outcomes: Outcome[] }, 400 Zod.
  * Reemplaza el shape plano (violaba OBJ-2: números falsos con decimales sueltos).
+ * Cada Outcome lleva access (frontera gratis/pago): margen → "free" (100% inputs usuario).
  */
 import { describe, it, expect } from "vitest";
 import { POST as margenPost } from "@/app/api/v1/margen/route";
@@ -25,6 +26,8 @@ function assertOutcome(o: any) {
   expect(typeof o.driver === "string" && o.driver.trim().length > 0).toBe(true);
   expect(typeof o.action === "string" && o.action.trim().length > 0).toBe(true);
   expect(["baja", "media", "alta"]).toContain(o.confidence);
+  expect(typeof o.access === "string").toBe(true);
+  expect(["free","contact-gated","paid"]).toContain(o.access);
 }
 
 describe("api/v1/margen — contrato honesto Outcome (OBJ-2)", () => {
@@ -41,7 +44,10 @@ describe("api/v1/margen — contrato honesto Outcome (OBJ-2)", () => {
     const data = await res.json();
     expect(Array.isArray(data.outcomes)).toBe(true);
     expect(data.outcomes.length).toBeGreaterThanOrEqual(1);
-    for (const o of data.outcomes) assertOutcome(o);
+    for (const o of data.outcomes) {
+      assertOutcome(o);
+      expect(o.access).toBe("free"); // margen es 100% free
+    }
     // metadata técnica permitida pero no números de producto sueltos
     if (data.formulaVersion !== undefined) expect(data.formulaVersion).toBe("margen-v1");
     expect(data.margenRealUnitario).toBeUndefined();
@@ -65,6 +71,7 @@ describe("api/v1/margen — contrato honesto Outcome (OBJ-2)", () => {
     const data = await res.json();
     expect(data.outcomes.length).toBeGreaterThanOrEqual(1);
     assertOutcome(data.outcomes[0]);
+    expect(data.outcomes[0].access).toBe("free");
     expect(data.outcomes[0].range[0]).toBeLessThanOrEqual(data.outcomes[0].range[1]);
   });
 
@@ -122,5 +129,7 @@ describe("api/v1/margen — contrato honesto Outcome (OBJ-2)", () => {
     expect(outcomes[0].driver).not.toMatch(/driver|action/i);
     expect(outcomes[0].driver.length).toBeGreaterThan(3);
     expect(outcomes[0].action.length).toBeGreaterThan(5);
+    expect(outcomes[0].access).toBe("free");
+    expect(typeof outcomes[0].access).toBe("string");
   });
 });

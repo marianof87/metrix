@@ -55,19 +55,19 @@ así un `SAVED` y un `RE_RUN` del mismo input coexisten.
 - `GET /api/v1/scenarios/[id]` — detalle + auditoría
 - `POST /api/v1/scenarios/[id]/re-run` — re-ejecutar (crea `RE_RUN`)
 
-Contrato OpenAPI: `src/app/api/v1/openapi/openapi.json` (margen pendiente de incorporar).
+Contrato OpenAPI: `src/app/api/v1/openapi/openapi.json` (incluye `/api/v1/margen` y el schema `Outcome` con `access`).
 
 ## Tests
 
 ```bash
-npm test          # 175 tests Vitest (dominio, servicio, contratos API, componentes)
+npm test          # 215 tests Vitest (dominio, servicio, contratos API, componentes)
 npm run test:e2e  # 12 tests Playwright (módulos, lead magnet, gráfico en vivo e historial)
 npm run lint
 npm run typecheck
 npm run build
 ```
 
-Suite actual: **206 tests Vitest — 203 verdes, 3 falls conocidos** (deuda técnica:
+Suite actual: **215 tests Vitest — 212 verdes, 3 falls conocidos** (deuda técnica:
 concurrencia en `scenario.service` y 500 de `/api/v1/lead-magnet` por mismatch de
 exports → roadmap Fase 4 de Metrix AI).
 
@@ -78,11 +78,12 @@ decimales**. Todo resultado se expresa como un `Outcome`:
 
 ```ts
 interface Outcome {
-  id: string;                    // hash canónico determinista del contenido
+  id: string;                    // hash canónico determinista del contenido (incluye access)
   range: [number, number];       // intervalo honesto [min, max]
   driver: string;                // la causa principal del resultado (castellano)
   action: string;                // una acción concreta, no un dato (castellano)
   confidence: "baja" | "media" | "alta";
+  access: "free" | "contact-gated" | "paid";  // OBJ-1
 }
 ```
 
@@ -91,6 +92,20 @@ interface Outcome {
   medición): margen → `"alta"` (todos los drivers vienen del input del usuario);
   lead-magnet → `"media"`/`"baja"` (la demanda es estimada, nunca medida).
 - Contrato OpenAPI: `src/app/api/v1/openapi/openapi.json` (schema `Outcome`).
+
+## OBJ-1 — frontera gratis/pago
+
+Regla de dominio: **gratis si el dueño aportó todos los números; pago si Metrix
+aportó uno que él no tenía** (dossier `HUMAN-WEEXPECT.md`, `OBJ-1`).
+
+- Cada `Outcome` lleva `access`:
+  - `"free"` — todos los drivers salen de inputs del usuario (p.ej. margen: comisión, merma, IVA, flete y costo los aporta el dueño).
+  - `"contact-gated"` — hay un driver estimado por el sistema (paid-eligible) pero el resultado se desbloquea con contacto (p.ej. lead-magnet: la demanda es estimada; el informe se entrega tras dejar lead).
+  - `"paid"` — Metrix aportó un número que el dueño no tenía. **El cobro NO está implementado** (AC Fase 3); el valor queda reservado en el contrato.
+- El `id` (hash determinista) incluye `access`: el mismo contenido con nivel distinto es un resultado distinto.
+- Regla canónica: `accessFromSources({ systemEstimatedDriver, gatedByContact })` en `src/domain/shared/outcome.ts`.
+- **Los precios y niveles NO los define el sistema** (decisión de Mariano, dossier §Waiver línea 165). Estado y preguntas pendientes: `docs/NIVELES_ACCESO_METRIX_AI.md`.
+- Persistencia: `Lead.access String?` (nullable) registra el nivel con el que se desbloqueó un contacto.
 
 ## Estructura
 
@@ -112,5 +127,7 @@ misma base SQLite (`prisma/dev.db`).
 
 ## Documentación
 
+- `docs/ROADMAP_REFUNDACION_METRIX_AI.md` — roadmap de refundación a Metrix AI: Fases 2 (OBJ-2 Outcome), 3 (OBJ-1 access), 4 (MVP-2) y 5 (MVP-3), más deuda técnica.
+- `docs/NIVELES_ACCESO_METRIX_AI.md` — niveles de acceso OBJ-1: regla de dominio, estado y decisiones pendientes de Mariano (precios/niveles).
 - `docs/METRIX_ARQUITECTURA_Y_PLAN.md` — blueprint completo: decisiones D1–D6,
   fórmulas v1, modelo de datos, protocolo de testing y fases CA0–CA8.

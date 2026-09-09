@@ -55,6 +55,9 @@ model Lead {
   empresa   String
   whatsapp  String
   email     String
+  /// Desbloqueo por contacto (OBJ-1): "free" | "contact-gated" | "paid"
+  /// Nullable: leads previos a Fase 3 no lo tienen.
+  access    String?
   createdAt DateTime @default(now())
 
   @@index([email])

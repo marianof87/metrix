@@ -135,6 +135,7 @@ export function toMargenOutcomes(
       driver: DRIVER_LABELS[driverKey],
       action: DRIVER_ACTIONS[driverKey],
       confidence: "alta",
+      access: "free",
     }),
   ];
 }
