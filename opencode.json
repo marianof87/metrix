@@ -1,0 +1,46 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "default_agent": "mega",
+  "instructions": [
+    "AGENTS.md"
+  ],
+  "model": "opencode/big-pickle",
+  "small_model": "opencode/nemotron-3.5-lightning-free",
+  "agent": {
+    "mega": {
+      "model": "opencode/big-pickle",
+      "description": "MEGA: orquestador/arquitecto del protocolo Commitar"
+    },
+    "test-writer": {
+      "model": "opencode/muse-spark-1.2-contributor-free",
+      "description": "Fase 2 RED: diseña tests que fallan (solo reporte)"
+    },
+    "code-reviewer": {
+      "model": "opencode/ling-3.0-flash-fin-free",
+      "description": "Fase 4 AUDIT: revisión de diffs (solo reporte)"
+    },
+    "debugger": {
+      "model": "opencode/mimo-v2.5-free",
+      "description": "Diagnóstico de causa-raíz (solo reporte)"
+    }
+  },
+  "mcp": {
+    "headroom": {
+      "type": "local",
+      "command": [
+        "C:\\Users\\PC\\AppData\\Local\\Headroom\\headroom\\runtime\\venv\\Scripts\\python.exe",
+        "-m",
+        "headroom.cli",
+        "mcp",
+        "serve"
+      ],
+      "enabled": true,
+      "environment": {
+        "HEADROOM_PROXY_URL": "http://127.0.0.1:6767"
+      }
+    }
+  },
+  "plugin": [
+    "./plugins/claude-mem.js"
+  ]
+}

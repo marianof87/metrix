@@ -18,6 +18,15 @@ import { computeInputHash } from "../scenarios/scenario.service";
 
 test.describe.configure({ mode: "serial" });
 
+test.beforeEach(async ({ page }) => {
+  const uniq = Date.now();
+  await page.goto("/register");
+  await page.getByLabel(/correo|email/i).fill(`historial-user-${uniq}@metrix.test`);
+  await page.getByLabel(/contraseña|password/i).fill("S3cur3P@ss!");
+  await page.getByRole("button", { name: /crear cuenta|registrarse|register/i }).click();
+  await expect(page).toHaveURL(/\//, { timeout: 10000 });
+});
+
 /** Valores únicos por corrida para no chocar con datos previos de la BD. */
 const NOW = Date.now();
 const BASE_COST = Math.floor(NOW / 1000);
